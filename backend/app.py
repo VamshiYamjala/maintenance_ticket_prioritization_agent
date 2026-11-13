@@ -33,6 +33,33 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_INDEX = BASE_DIR / "frontend" / "index.html"
 EVAL_RESULTS_PATH = BASE_DIR / "docs" / "evaluation_results.json"
 
+
+def resolve_frontend_path() -> Path:
+    if FRONTEND_INDEX.exists():
+        return FRONTEND_INDEX
+    for candidate in [
+        BASE_DIR / "frontend" / "index.html",
+        Path.cwd() / "frontend" / "index.html",
+        Path("/var/task/frontend/index.html"),
+    ]:
+        if candidate.exists():
+            return candidate
+    return FRONTEND_INDEX
+
+
+def resolve_eval_path() -> Path:
+    if EVAL_RESULTS_PATH.exists():
+        return EVAL_RESULTS_PATH
+    for candidate in [
+        BASE_DIR / "docs" / "evaluation_results.json",
+        Path.cwd() / "docs" / "evaluation_results.json",
+        Path("/var/task/docs/evaluation_results.json"),
+    ]:
+        if candidate.exists():
+            return candidate
+    return EVAL_RESULTS_PATH
+
+
 _agent: TicketTriageAgent | None = None
 
 
@@ -76,19 +103,23 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 
 @app.get("/")
+@app.get("/index.html")
+@app.get("/api/index.py")
 def serve_frontend() -> FileResponse:
-    if not FRONTEND_INDEX.exists():
+    target = resolve_frontend_path()
+    if not target.exists():
         raise HTTPException(status_code=404, detail="Frontend index.html not found.")
-    return FileResponse(FRONTEND_INDEX)
+    return FileResponse(target)
 
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     agent = get_agent()
+    eval_path = resolve_eval_path()
     return {
         "status": "ok",
         "model_loaded": agent.cat_pipeline is not None and agent.sev_pipeline is not None,
-        "eval_results_available": EVAL_RESULTS_PATH.exists(),
+        "eval_results_available": eval_path.exists(),
     }
 
 
@@ -215,9 +246,10 @@ async def triage_batch_csv(file: UploadFile = File(...)) -> dict[str, Any]:
 
 @app.get("/api/metrics")
 def get_metrics() -> dict[str, Any]:
-    if not EVAL_RESULTS_PATH.exists():
+    eval_path = resolve_eval_path()
+    if not eval_path.exists():
         raise HTTPException(
             status_code=404,
             detail="Evaluation results not found. Run 'python -m backend.evaluate' first.",
         )
-    return json.loads(EVAL_RESULTS_PATH.read_text(encoding="utf-8"))
+    return json.loads(eval_path.read_text(encoding="utf-8"))

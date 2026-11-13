@@ -34,6 +34,32 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 RUNBOOK_PATH = BASE_DIR / "data" / "runbook.json"
 MODELS_DIR = BASE_DIR / "models"
 
+
+def resolve_models_dir() -> Path:
+    if (MODELS_DIR / "category_pipeline.joblib").exists():
+        return MODELS_DIR
+    for candidate in [
+        BASE_DIR / "models",
+        Path.cwd() / "models",
+        Path("/var/task/models"),
+    ]:
+        if (candidate / "category_pipeline.joblib").exists():
+            return candidate
+    return MODELS_DIR
+
+
+def resolve_runbook_path() -> Path:
+    if RUNBOOK_PATH.exists():
+        return RUNBOOK_PATH
+    for candidate in [
+        BASE_DIR / "data" / "runbook.json",
+        Path.cwd() / "data" / "runbook.json",
+        Path("/var/task/data/runbook.json"),
+    ]:
+        if candidate.exists():
+            return candidate
+    return RUNBOOK_PATH
+
 CATEGORY_CONF_THRESHOLD = 0.45
 SEVERITY_CONF_THRESHOLD = 0.40
 TOP2_MARGIN_THRESHOLD = 0.12
@@ -81,23 +107,25 @@ class TicketTriageAgent:
         self,
         cat_pipeline: Pipeline | None = None,
         sev_pipeline: Pipeline | None = None,
-        runbook_path: Path = RUNBOOK_PATH,
+        runbook_path: Path | None = None,
     ) -> None:
         self.cat_pipeline = cat_pipeline
         self.sev_pipeline = sev_pipeline
-        self.runbook = json.loads(runbook_path.read_text(encoding="utf-8"))
+        target_runbook = runbook_path or resolve_runbook_path()
+        self.runbook = json.loads(target_runbook.read_text(encoding="utf-8"))
         self.recent_tickets: list[dict[str, str]] = []
 
     @classmethod
-    def from_disk(cls, models_dir: Path = MODELS_DIR) -> "TicketTriageAgent":
-        cat_path = models_dir / "category_pipeline.joblib"
-        sev_path = models_dir / "severity_pipeline.joblib"
+    def from_disk(cls, models_dir: Path | None = None) -> "TicketTriageAgent":
+        target_models_dir = models_dir or resolve_models_dir()
+        cat_path = target_models_dir / "category_pipeline.joblib"
+        sev_path = target_models_dir / "severity_pipeline.joblib"
         if not cat_path.exists() or not sev_path.exists():
             # In serverless environments (e.g. Vercel), the filesystem is read-only outside /tmp.
             # Train in-memory or save only if the target directory is writable.
             from backend.train import train_and_save_models
             try:
-                cat_pipe, sev_pipe = train_and_save_models(models_dir=models_dir)
+                cat_pipe, sev_pipe = train_and_save_models(models_dir=target_models_dir)
             except (OSError, PermissionError):
                 # Target models directory is read-only; train in memory without disk save
                 import tempfile
