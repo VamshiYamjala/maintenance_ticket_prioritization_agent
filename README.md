@@ -64,11 +64,31 @@ All endpoints use same-origin relative paths:
 | `POST` | `/api/run` | Starter-compatible triage endpoint |
 | `POST` | `/api/batch` | Batch triage for a list of tickets (JSON payload) |
 | `POST` | `/api/batch-csv` | Batch triage for an uploaded CSV file (`asset_type`, `description`) |
+| `POST` | `/api/reports/ticket-pdf` | Generates and downloads an official 5-page enterprise PDF assessment report with full 9-step audit trace |
 | `GET` | `/api/metrics` | Serves real offline evaluation metrics and benchmark tables |
 
 ---
 
-## 4. Dataset Overview & Honest Evaluation
+## 4. AI-Generated Maintenance Assessment PDF Report Feature
+
+The platform includes an enterprise-grade PDF report generation module (`backend/pdf_generator.py`) built using **Python ReportLab**. It renders an official, multi-section A4 industrial maintenance assessment document using real data from the current AI triage execution.
+
+### Multi-Page Report Architecture:
+1. **Page 1: Report Cover & Executive Summary:** Greenko Group O&M branding, unique report ID (`GKO-RPT-YYYYMMDD-XXXX`), ticket metadata, highlighted assessment card with priority score (0–100), fault category, final severity rating, safety escalation status, operational SLA, and executive disclaimer.
+2. **Page 2: Ticket Details & AI Analysis:** Raw observation text, normalized clean text, extracted equipment/site entities, ML classification confidences, category probabilities, top contributing explainability tokens, and deterministic safety override checks.
+3. **Page 3: Priority & Operational Routing:** Full mathematical breakdown of the 5-factor priority formula, component weights, SLA dispatch standards (Critical: 1h, High: 4h, Medium: 24h, Low: 72h), and historical duplicate defect analysis.
+4. **Page 4: Runbook Standard Operating Procedure (SOP):** Retrieved runbook ID, matched fault category, candidate probable root causes for physical inspection, sequential troubleshooting steps, and statutory LOTO safety directives.
+5. **Page 5: AI Agent Execution Trace & Audit Trail:** Structured table of all 9 agent workflow steps (`normalize_and_extract`, `classify_ticket`, `safety_guardrail`, `lookup_runbook`, `check_duplicates`, `compute_priority`, `route_ticket`, `confidence_gate`, `explanation_layer`), human review gate status, operational limitations, and formal plant engineering sign-off blocks.
+
+### PDF Technical Design:
+- **In-Memory Generation:** Generated in-memory via `io.BytesIO` buffers — no permanent files written to serverless storage.
+- **Two-Pass Page Numbering:** Utilizes a custom `NumberedCanvas` to calculate total pages and render running headers and footers ("Page X of 5") with confidentiality labels.
+- **Brand Aesthetic:** Professional Greenko industrial color palette (deep navy `#0F2D3A`, emerald green `#059669`, subtle table tints, clean typography).
+- **UI Integration:** Direct "Download PDF Report" and "Print Report" action buttons in the web UI, plus instant PDF export from Session Ticket History.
+
+---
+
+## 5. Dataset Overview & Honest Evaluation
 
 - **`data/maintenance_tickets.csv` (Untouched Bundled Data):** 6 starter rows across solar, wind, hydro, and grid.
 - **`data/maintenance_tickets_synthetic.csv` (Synthetic Training Data):** 420 tickets generated with fixed seed (`seed=42`) incorporating realistic equipment IDs (`WTG-12`, `Inverter 4`), abbreviations (`SCADA`, `MPPT`, `RTU`), typos, and casing variations.
@@ -87,17 +107,18 @@ All endpoints use same-origin relative paths:
 
 ---
 
-## 5. Deployment on Vercel
+## 6. Deployment on Vercel
 
 The application is fully configured for zero-configuration deployment to **Vercel**:
 
-- **Vercel Config:** `vercel.json` and `pyproject.toml` (`[tool.vercel] entrypoint = "api/index.py"`).
+- **Framework:** FastAPI backend framework project with entrypoint `main:app` (configured in `pyproject.toml`).
 - **Runtime:** Python 3.12 (pinned in `.python-version`).
+- **Dependency Management:** Synchronized via `requirements.txt`, `pyproject.toml`, and `uv.lock`.
 - **Instructions:** See [DEPLOYMENT.md](DEPLOYMENT.md) for click-by-click deployment steps from GitHub or via `npx vercel`.
 
 ---
 
-## 6. Current Limitations & Production Roadmap
+## 7. Current Limitations & Production Roadmap
 
 1. **Synthetic Training Data:** Prototype trained on 420 synthetic tickets; production requires historical CMMS records.
 2. **Single-Label Classification:** Compound multi-fault tickets receive one primary category; secondary faults trigger human review.

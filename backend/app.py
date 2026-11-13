@@ -7,9 +7,11 @@ runs a single service.
 
 from __future__ import annotations
 
+import datetime
 import io
 import json
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -17,9 +19,10 @@ from typing import Any
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from backend.agent import TicketTriageAgent
+from backend.pdf_generator import generate_maintenance_report_pdf
 from backend.preprocessing import ALLOWED_ASSET_TYPES
 from backend.schemas import BatchTriageRequest, LegacyRunQuery, TriageRequest
 
@@ -253,3 +256,40 @@ def get_metrics() -> dict[str, Any]:
             detail="Evaluation results not found. Run 'python -m backend.evaluate' first.",
         )
     return json.loads(eval_path.read_text(encoding="utf-8"))
+
+
+@app.post("/api/reports/ticket-pdf")
+def create_ticket_pdf(payload: dict[str, Any]) -> Response:
+    """
+    Generate and download a professional 5-page enterprise PDF report
+    for the provided ticket triage result.
+    """
+    if not payload or not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="Valid ticket triage result dictionary is required.",
+        )
+
+    # Sanitize ticket ID for filename
+    raw_tid = str(payload.get("ticket_id") or "ADHOC").strip()
+    safe_tid = re.sub(r"[^A-Za-z0-9_-]", "_", raw_tid)[:30] or "TICKET"
+    date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    filename = f"Maintenance_Report_{safe_tid}_{date_str}.pdf"
+
+    try:
+        pdf_bytes = generate_maintenance_report_pdf(payload)
+    except Exception as exc:
+        logger.exception("Failed to generate PDF report: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate maintenance report PDF: {exc}",
+        ) from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
