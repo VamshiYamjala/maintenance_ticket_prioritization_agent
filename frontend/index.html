@@ -1840,13 +1840,8 @@ priority_score = 100 * (
   </div>
 
   <script>
-    // Configuration & Backend URL detection
-    const urlParams = new URLSearchParams(window.location.search);
-    const API_BASE = (
-      urlParams.get('api') ||
-      window.API_BASE_URL ||
-      (window.location.hostname.endsWith('vercel.app') ? 'https://greenko-ticket-triage-agent.onrender.com' : '')
-    ).replace(/\/$/, '');
+    // Configuration: Unified same-origin relative API path for Vercel & local
+    const API_BASE = '';
 
     let currentNav = 'dashboard';
     let metricsCache = null;

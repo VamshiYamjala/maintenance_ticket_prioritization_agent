@@ -93,8 +93,16 @@ class TicketTriageAgent:
         cat_path = models_dir / "category_pipeline.joblib"
         sev_path = models_dir / "severity_pipeline.joblib"
         if not cat_path.exists() or not sev_path.exists():
+            # In serverless environments (e.g. Vercel), the filesystem is read-only outside /tmp.
+            # Train in-memory or save only if the target directory is writable.
             from backend.train import train_and_save_models
-            cat_pipe, sev_pipe = train_and_save_models(models_dir=models_dir)
+            try:
+                cat_pipe, sev_pipe = train_and_save_models(models_dir=models_dir)
+            except (OSError, PermissionError):
+                # Target models directory is read-only; train in memory without disk save
+                import tempfile
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    cat_pipe, sev_pipe = train_and_save_models(models_dir=Path(tmp_dir))
             return cls(cat_pipeline=cat_pipe, sev_pipeline=sev_pipe)
         return cls(
             cat_pipeline=joblib.load(cat_path),
