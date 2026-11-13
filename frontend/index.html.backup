@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Greenko O&amp;M | Maintenance Ticket Prioritization Agent</title>
+  <style>
+    :root {
+      --bg: #0b1318;
+      --panel: #111d24;
+      --panel-alt: #16252e;
+      --border: #233845;
+      --text: #e6eef2;
+      --muted: #93a7b4;
+      --accent: #10b981;
+      --accent-dark: #065f46;
+      --crit: #ef4444;
+      --high: #f97316;
+      --med: #eab308;
+      --low: #22c55e;
+      --info: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      background: linear-gradient(135deg, #0b2920 0%, #0f1f29 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 28px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    header h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.2px; }
+    header p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+    .nav-tabs { display: flex; gap: 8px; }
+    .tab-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .tab-btn.active {
+      background: var(--accent-dark);
+      color: #ecfdf5;
+      border-color: var(--accent);
+    }
+    main { max-width: 1220px; margin: 0 auto; padding: 22px 24px 48px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1.25fr; gap: 20px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 16px; color: #f1f5f9; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+    select, textarea {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    select:focus, textarea:focus, button:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .btn-primary {
+      background: var(--accent);
+      color: #042f2e;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .btn-primary:disabled { opacity: 0.6; cursor: wait; }
+    .btn-sample {
+      background: var(--panel-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 11px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-sample:hover { border-color: var(--accent); }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .sev-critical { background: rgba(239,68,68,.18); color: #fca5a5; border: 1px solid var(--crit); }
+    .sev-high { background: rgba(249,115,22,.18); color: #fdba74; border: 1px solid var(--high); }
+    .sev-medium { background: rgba(234,179,8,.18); color: #fde047; border: 1px solid var(--med); }
+    .sev-low { background: rgba(34,197,94,.18); color: #86efac; border: 1px solid var(--low); }
+    .badge-warn { background: rgba(234,179,8,.2); color: #fde047; border: 1px solid var(--med); }
+    .badge-info { background: rgba(56,189,248,.16); color: #7dd3fc; border: 1px solid var(--info); }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; margin: 12px 0; }
+    .kpi {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .kpi .k-label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+    .kpi .k-val { font-size: 16px; font-weight: 700; margin-top: 2px; }
+    .highlight-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+    }
+    mark.term-hit {
+      background: rgba(16, 185, 129, 0.28);
+      color: #a7f3d0;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    .trace-step {
+      border-left: 3px solid var(--accent);
+      background: var(--panel-alt);
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-radius: 0 8px 8px 0;
+      font-size: 13px;
+    }
+    .trace-step.escalated { border-left-color: var(--crit); }
+    .trace-title { font-weight: 700; color: #f8fafc; }
+    .trace-body { color: var(--muted); font-family: ui-monospace, Consolas, monospace; font-size: 12px; margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; }
+    th { background: var(--panel-alt); color: #cbd5e1; }
+    .error-banner {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--crit);
+      color: #fecaca;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: none;
+    }
+    .muted { color: var(--muted); font-size: 13px; }
+    ul { margin: 6px 0; padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Greenko O&amp;M Ticket Triage Agent</h1>
+      <p>Hybrid NLP Classification + Deterministic Safety Guardrail + Runbook Retrieval <span id="apiStatus" class="badge badge-info" style="margin-left:8px;">Backend: Checking...</span></p>
+    </div>
+    <nav class="nav-tabs" aria-label="Primary sections">
+      <button class="tab-btn active" onclick="switchTab('triage', this)">Triage Console</button>
+      <button class="tab-btn" onclick="switchTab('metrics', this)">Evaluation Metrics</button>
+      <button class="tab-btn" onclick="switchTab('limitations', this)">Limitations &amp; Formula</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- TAB 1: TRIAGE CONSOLE -->
+    <section id="tab-triage" class="tab-panel active">
+      <div class="grid-2">
+        <div>
+          <div class="card">
+            <h2>1. Incoming Maintenance Ticket</h2>
+            <label for="assetType">Asset Type</label>
+            <select id="assetType">
+              <option value="solar">Solar</option>
+              <option value="wind">Wind</option>
+              <option value="hydro">Hydro</option>
+              <option value="grid">Grid</option>
+            </select>
+
+            <label for="ticketText" style="margin-top:12px;">Ticket Description</label>
+            <textarea id="ticketText" placeholder="Enter free-text O&amp;M ticket (e.g., Inverter 4 tripping repeatedly after noon, high temperature alarm visible)"></textarea>
+
+            <div class="btn-row">
+              <button id="runBtn" class="btn-primary" onclick="runTriage()">Run Triage Agent</button>
+            </div>
+
+            <div style="margin-top:14px;">
+              <span class="muted">Rehearsed Demo Tickets:</span>
+              <div class="btn-row">
+                <button class="btn-sample" onclick="loadSample('solar', 'Inverter 4 tripping repeatedly after noon, high temperature alarm visible at Block 2')">Demo 1: Solar Inverter</button>
+                <button class="btn-sample" onclick="loadSample('wind', 'WTG-12 gearbox vibration spike with loud grinding noise and metallic debris suspected')">Demo 2: Wind Gearbox</button>
+                <button class="btn-sample" onclick="loadSample('grid', 'Arc flash sparks observed inside 33kV switchgear bay 1 during switching; area evacuated')">Demo 3: Grid Arc Flash</button>
+              </div>
+            </div>
+            <div id="errorBox" class="error-banner" role="alert"></div>
+          </div>
+
+          <div class="card" id="explainCard" style="display:none;">
+            <h2>Why This Prediction (Contributing Terms)</h2>
+            <div id="highlightedText" class="highlight-box"></div>
+            <p class="muted" id="termsList" style="margin-top:8px;"></p>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" id="emptyState">
+            <h2>2. Triage Decision &amp; Agent Trace</h2>
+            <p class="muted">Select a demo ticket or enter a description and click <strong>Run Triage Agent</strong> to inspect the prediction, safety guardrail, runbook actions, and step-by-step tool trace.</p>
+          </div>
+
+          <div id="resultContainer" style="display:none;">
+            <div class="card">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <h2 style="margin:0;">Triage Decision</h2>
+                <div id="badgesRow"></div>
+              </div>
+
+              <div class="kpi-grid">
+                <div class="kpi"><div class="k-label">Category</div><div class="k-val" id="resCategory">-</div></div>
+                <div class="kpi"><div class="k-label">Priority Score</div><div class="k-val" id="resPriority">-</div></div>
+                <div class="kpi"><div class="k-label">SLA Target</div><div class="k-val" id="resSla">-</div></div>
+                <div class="kpi"><div class="k-label">Owner Team</div><div class="k-val" id="resTeam" style="font-size:13px;">-</div></div>
+                <div class="kpi"><div class="k-label">Cat / Sev Conf</div><div class="k-val" id="resConf">-</div></div>
+              </div>
+
+              <p id="resExplanation" style="margin:10px 0 4px; font-size:14px;"></p>
+              <p class="muted" id="resMeta"></p>
+            </div>
+
+            <div class="card">
+              <h2>Runbook Evidence (Probable Causes to Check &amp; Next Actions)</h2>
+              <strong style="font-size:13px;">Probable Root Causes to Check:</strong>
+              <ul id="resCauses"></ul>
+              <strong style="font-size:13px;">Recommended Next Actions:</strong>
+              <ul id="resActions"></ul>
+            </div>
+
+            <div class="card">
+              <h2>Agent Tool Trace</h2>
+              <div id="traceList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: METRICS -->
+    <section id="tab-metrics" class="tab-panel">
+      <div class="card">
+        <h2>Offline Evaluation &amp; Safety Metrics</h2>
+        <p class="muted">Loaded live from <code>GET /api/metrics</code> (generated by <code>python -m backend.evaluate</code>).</p>
+        <div id="metricsContent">Loading evaluation metrics...</div>
+      </div>
+    </section>
+
+    <!-- TAB 3: LIMITATIONS -->
+    <section id="tab-limitations" class="tab-panel">
+      <div class="card">
+        <h2>Transparent Priority Formula</h2>
+        <p><code>priority_score = 100 * (0.45 * severity_weight + 0.20 * asset_criticality + 0.20 * generation_loss_risk + 0.10 * safety_flag + 0.05 * min(duplicate_count, 3) / 3)</code></p>
+        <p class="muted">Where <code>severity_weight</code> is low=0.25, medium=0.50, high=0.75, critical=1.00.</p>
+      </div>
+      <div class="card">
+        <h2>Honest Limitations &amp; Production Gaps</h2>
+        <ul>
+          <li><strong>Tiny bundled dataset:</strong> The starter CSV has only 6 rows; training uses a seeded synthetic dataset (420 tickets) plus a separate 30-ticket hand-written challenge set.</li>
+          <li><strong>Single-label assumption:</strong> Multi-issue tickets (e.g., thermal fault + SCADA gap) are assigned one primary category; the confidence gate flags close secondaries for human review.</li>
+          <li><strong>No live CMMS / SCADA integration:</strong> Duplicate detection runs on an in-memory rolling buffer, not a persistent CMMS database.</li>
+          <li><strong>English only &amp; no drift monitoring:</strong> Requires real labelled plant tickets and periodic retraining before production deployment.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const API_BASE = (
+      urlParams.get('api') ||
+      window.API_BASE_URL ||
+      (window.location.hostname.endsWith('vercel.app') ? 'https://greenko-ticket-triage-agent.onrender.com' : '')
+    ).replace(/\/$/, '');
+
+    let metricsLoaded = false;
+
+    async function checkBackendHealth() {
+      const pill = document.getElementById('apiStatus');
+      try {
+        const res = await fetch(API_BASE + '/api/health');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const j = await res.json();
+        pill.textContent = j.status === 'ok' ? 'Backend: Ready' : 'Backend: Degraded';
+        pill.className = 'badge sev-low';
+      } catch (e) {
+        pill.textContent = 'Backend: Waking up / Offline';
+        pill.className = 'badge badge-warn';
+      }
+    }
+    window.addEventListener('DOMContentLoaded', checkBackendHealth);
+
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      btn.classList.add('active');
+      if (name === 'metrics' && !metricsLoaded) {
+        loadMetrics();
+      }
+    }
+
+    function loadSample(asset, text) {
+      document.getElementById('assetType').value = asset;
+      document.getElementById('ticketText').value = text;
+      runTriage();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    function highlightTerms(rawText, terms) {
+      let html = escapeHtml(rawText);
+      const words = (terms || [])
+        .map(t => t.term)
+        .filter(t => !t.startsWith('asset_type_'))
+        .sort((a, b) => b.length - a.length);
+      for (const w of words) {
+        const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp('\\b(' + escaped + ')\\b', 'gi');
+        html = html.replace(re, '<mark class="term-hit">$1</mark>');
+      }
+      return html;
+    }
+
+    async function runTriage() {
+      const asset = document.getElementById('assetType').value;
+      const text = document.getElementById('ticketText').value.trim();
+      const errBox = document.getElementById('errorBox');
+      const btn = document.getElementById('runBtn');
+      errBox.style.display = 'none';
+
+      if (text.length < 5) {
+        errBox.textContent = 'Please enter at least 5 characters describing the maintenance issue.';
+        errBox.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Running Agent...';
+      try {
+        const res = await fetch(API_BASE + '/api/triage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ asset_type: asset, description: text })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || JSON.stringify(data));
+        }
+        renderResult(text, data);
+      } catch (err) {
+        errBox.textContent = 'Error: ' + err.message;
+        errBox.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Triage Agent';
+      }
+    }
+
+    function renderResult(rawText, d) {
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('resultContainer').style.display = 'block';
+      document.getElementById('explainCard').style.display = 'block';
+
+      const sevClass = 'sev-' + d.severity;
+      let badges = `<span class="badge ${sevClass}">${d.severity}</span>`;
+      if (d.guardrail_escalated) {
+        badges += ` <span class="badge sev-critical">Guardrail Escalated (from ${d.ml_severity})</span>`;
+      }
+      if (d.needs_human_review) {
+        badges += ` <span class="badge badge-warn">Needs Human Review</span>`;
+      }
+      badges += ` <span class="badge badge-info">Source: ${d.explanation_source}</span>`;
+      document.getElementById('badgesRow').innerHTML = badges;
+
+      document.getElementById('resCategory').textContent = d.category;
+      document.getElementById('resPriority').textContent = d.priority_score + ' / 100';
+      document.getElementById('resSla').textContent = d.sla_hours + 'h (' + d.escalation_tier.split(' ')[0] + ')';
+      document.getElementById('resTeam').textContent = d.owner_team;
+      document.getElementById('resConf').textContent =
+        (d.confidence.category * 100).toFixed(0) + '% / ' + (d.confidence.severity * 100).toFixed(0) + '%';
+
+      document.getElementById('resExplanation').textContent = d.explanation;
+      const eq = d.equipment_ids.length ? d.equipment_ids.join(', ') : 'None detected';
+      const sites = d.site_hints.length ? d.site_hints.join(', ') : 'None detected';
+      document.getElementById('resMeta').textContent =
+        `Equipment IDs: ${eq} | Site Hints: ${sites} | Repeats: ${d.duplicate_info.duplicate_count}`;
+
+      document.getElementById('highlightedText').innerHTML = highlightTerms(rawText, d.top_contributing_terms);
+      document.getElementById('termsList').textContent =
+        'Top contributing features: ' + (d.top_contributing_terms || []).map(t => `${t.term} (+${t.weight})`).join(', ');
+
+      document.getElementById('resCauses').innerHTML = (d.probable_causes || []).map(c => `<li>${escapeHtml(c)}</li>`).join('');
+      document.getElementById('resActions').innerHTML = (d.next_actions || []).map(a => `<li>${escapeHtml(a)}</li>`).join('');
+
+      document.getElementById('traceList').innerHTML = (d.agent_trace || []).map(step => {
+        const isEsc = step.tool === 'safety_guardrail' && step.output && step.output.escalated;
+        return `<div class="trace-step ${isEsc ? 'escalated' : ''}">
+          <div class="trace-title">Step ${step.step}: ${escapeHtml(step.tool)}</div>
+          <div class="trace-body">${escapeHtml(JSON.stringify(step.output))}</div>
+        </div>`;
+      }).join('');
+    }
+
+    async function loadMetrics() {
+      const box = document.getElementById('metricsContent');
+      try {
+        const res = await fetch(API_BASE + '/api/metrics');
+        if (!res.ok) throw new Error('Metrics not generated yet.');
+        const m = await res.json();
+        metricsLoaded = true;
+
+        const cv = m.cross_validation;
+        let html = `<div class="kpi-grid">
+          <div class="kpi"><div class="k-label">Dataset (Dedup)</div><div class="k-val">${m.dataset_summary.total_deduplicated_rows} rows</div></div>
+          <div class="kpi"><div class="k-label">5-Fold Cat F1</div><div class="k-val">${cv.category_macro_f1.mean} ± ${cv.category_macro_f1.std}</div></div>
+          <div class="kpi"><div class="k-label">5-Fold Crit Recall</div><div class="k-val">${cv.critical_recall.mean} ± ${cv.critical_recall.std}</div></div>
+          <div class="kpi"><div class="k-label">5-Fold Under-Triage</div><div class="k-val">${cv.under_triage_rate.mean} ± ${cv.under_triage_rate.std}</div></div>
+        </div>`;
+
+        html += `<h3>Model Comparison (Test Set &amp; Hand-Written Challenge Set)</h3>
+          <table><thead><tr><th>Model</th><th>Test Cat Macro-F1</th><th>Test Crit Recall</th><th>Test Under-Triage</th><th>Challenge Cat F1</th><th>Challenge Under-Triage</th></tr></thead><tbody>`;
+        for (const r of m.model_comparison) {
+          html += `<tr>
+            <td>${escapeHtml(r.model)}</td>
+            <td>${r.test_category_macro_f1}</td>
+            <td>${r.test_severity_metrics.critical_recall}</td>
+            <td>${r.test_severity_metrics.under_triage_rate}</td>
+            <td>${r.challenge_category_macro_f1}</td>
+            <td>${r.challenge_severity_metrics.under_triage_rate}</td>
+          </tr>`;
+        }
+        html += `</tbody></table>`;
+
+        html += `<h3 style="margin-top:16px;">Feature Ablation (LogReg)</h3>
+          <table><thead><tr><th>Variant</th><th>Test Cat F1</th><th>Test Sev F1</th><th>Challenge Cat F1</th><th>Challenge Sev F1</th></tr></thead><tbody>`;
+        for (const a of m.ablation) {
+          html += `<tr><td>${escapeHtml(a.variant)}</td><td>${a.test_category_macro_f1}</td><td>${a.test_severity_macro_f1}</td><td>${a.challenge_category_macro_f1}</td><td>${a.challenge_severity_macro_f1}</td></tr>`;
+        }
+        html += `</tbody></table>`;
+
+        html += `<h3 style="margin-top:16px;">Test Severity Confusion Matrix (rows=actual, cols=pred: ${m.severity_labels.join(', ')})</h3>
+          <table><thead><tr><th>Actual \\ Pred</th>${m.severity_labels.map(s => `<th>${s}</th>`).join('')}</tr></thead><tbody>`;
+        m.test_severity_confusion_matrix.forEach((row, i) => {
+          html += `<tr><th>${m.severity_labels[i]}</th>${row.map(v => `<td>${v}</td>`).join('')}</tr>`;
+        });
+        html += `</tbody></table>`;
+
+        box.innerHTML = html;
+      } catch (err) {
+        box.innerHTML = `<p class="muted">Could not load metrics: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
