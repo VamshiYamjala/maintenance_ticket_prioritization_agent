@@ -1,10 +1,34 @@
 """
-Optional LLM Explanation Layer (OFF by default).
+===============================================================================
+FILE: backend/llm_explainer.py
+===============================================================================
+1. WHAT THIS FILE DOES:
+   Provides an explanation layer that converts structured triage predictions
+   into a concise, human-readable 2–3 sentence operational summary. By default,
+   it runs in deterministic template mode with ZERO external API calls. Optionally,
+   if an LLM API key is provided in the environment, it can call an OpenAI-compatible
+   endpoint with automatic retry and guaranteed fallback.
 
-Turns already-computed structured triage fields into a short analyst summary.
-Never alters category, severity, or priority.
-Falls back deterministically to a verified template if LLM_PROVIDER is 'none',
-LLM_API_KEY is missing, or the external call fails/times out.
+2. WHY THIS FILE IS NEEDED:
+   Control-room operators and technicians reviewing tickets need a quick narrative
+   summary explaining the triage decision, probable cause, and immediate recommended
+   action. Crucially, this layer acts strictly as a summarizer: it NEVER alters the
+   predicted category, severity, priority score, or assigned team.
+
+3. WHICH OTHER FILES USE IT:
+   - backend/agent.py: Calls `generate_explanation()` in Tool Step 9.
+   - tests/test_triage.py: Verifies fallback to template when API keys are absent.
+
+4. WHAT INPUT IT RECEIVES:
+   - `structured_result` (dict): Complete dictionary of verified triage fields
+     (category, severity, priority_score, owner_team, probable_causes, etc.).
+
+5. WHAT OUTPUT IT PRODUCES:
+   - dict: {
+         "explanation": str (plain-English summary),
+         "explanation_source": "template" | "llm"
+     }
+===============================================================================
 """
 
 from __future__ import annotations
@@ -17,7 +41,26 @@ import httpx
 
 
 def _template_explanation(result: dict[str, Any]) -> str:
-    """Deterministic, verified template explanation built strictly from computed fields."""
+    """
+    1. WHAT IT DOES:
+       Synthesizes a deterministic, verified narrative summary directly from
+       computed dictionary fields without calling any external AI models.
+
+    2. WHY WE NEED IT:
+       Guarantees 100% offline reliability, zero latency overhead, zero financial cost,
+       and zero risk of hallucinations or fabricated information.
+
+    3. PARAMETERS:
+       - result (dict): The structured ticket evaluation dictionary.
+
+    4. RETURNS:
+       str: A 2-to-3 sentence plain English summary.
+
+    5. HOW IT WORKS INTERNALLY:
+       Extracts equipment IDs, notes if a safety guardrail escalation occurred,
+       notes if human review was flagged, selects the top candidate cause and action,
+       and formats them into a standardized operational sentence.
+    """
     equip = ", ".join(result.get("equipment_ids") or []) or "unspecified equipment"
     guard_note = (
         f" Safety guardrail escalated severity from {result['ml_severity']} to {result['severity']}."
@@ -37,11 +80,15 @@ def _template_explanation(result: dict[str, Any]) -> str:
 
 
 def _call_openai_compatible(prompt: str, api_key: str, model: str, timeout: float) -> str:
+    """
+    Calls an external OpenAI-compatible chat completion endpoint.
+    Constrained with strict system instructions prohibiting fabrication.
+    """
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": model,
-        "temperature": 0.1,
+        "temperature": 0.1,  # Low temperature for deterministic, factual outputs
         "max_tokens": 180,
         "messages": [
             {
@@ -64,19 +111,32 @@ def _call_openai_compatible(prompt: str, api_key: str, model: str, timeout: floa
 
 
 def generate_explanation(structured_result: dict[str, Any]) -> dict[str, str]:
-    """Return {'explanation': str, 'explanation_source': 'llm' | 'template'}."""
+    """
+    1. WHAT IT DOES:
+       Coordinates the explanation layer. Checks environment configuration:
+       if LLM_PROVIDER is 'none' or unconfigured (the default), immediately returns
+       the deterministic template explanation. Otherwise attempts an LLM call with
+       automatic retry and graceful fallback.
+
+    2. PARAMETERS:
+       - structured_result (dict): Full triage result dictionary.
+
+    3. RETURNS:
+       dict: {"explanation": str, "explanation_source": "template" | "llm"}
+    """
     provider = os.getenv("LLM_PROVIDER", "none").strip().lower()
     api_key = os.getenv("LLM_API_KEY", "").strip()
     model = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
     timeout = float(os.getenv("LLM_TIMEOUT_SECONDS", "8"))
 
+    # Default to zero-latency deterministic template if no provider/key configured
     if provider in ("", "none") or not api_key or api_key == "your_api_key_here":
         return {
             "explanation": _template_explanation(structured_result),
             "explanation_source": "template",
         }
 
-    # Send only verified structured fields
+    # Pass strictly structured data to prevent hallucination
     safe_context = {
         "asset_type": structured_result.get("asset_type"),
         "equipment_ids": structured_result.get("equipment_ids"),
@@ -92,7 +152,7 @@ def generate_explanation(structured_result: dict[str, Any]) -> dict[str, str]:
     }
     prompt = f"Summarize this verified triage output:\n{json.dumps(safe_context)}"
 
-    # Retry once on transient failure, then fall back to template
+    # Retry once on transient network failure, then fall back to template
     for _attempt in range(2):
         try:
             if provider == "openai":
@@ -103,6 +163,7 @@ def generate_explanation(structured_result: dict[str, Any]) -> dict[str, str]:
         except Exception:
             continue
 
+    # Guaranteed fallback
     return {
         "explanation": _template_explanation(structured_result),
         "explanation_source": "template",

@@ -1,15 +1,41 @@
 """
-Rule/tool-based Maintenance Ticket Triage Agent.
+===============================================================================
+FILE: backend/agent.py
+===============================================================================
+1. WHAT THIS FILE DOES:
+   Implements the core `TicketTriageAgent` class, which executes a sequential,
+   deterministic 9-step hybrid tool pipeline to triage incoming maintenance tickets:
+     Step 1: normalize_and_extract (Entity extraction via regex)
+     Step 2: classify_ticket (TF-IDF + Logistic Regression category & severity)
+     Step 3: safety_guardrail (Deterministic hazard rules with negation detection)
+     Step 4: lookup_runbook (TF-IDF Cosine Similarity over local SOP runbooks)
+     Step 5: check_duplicates (Token Jaccard similarity against recent tickets)
+     Step 6: compute_priority (5-factor transparent priority scoring 0–100)
+     Step 7: route_ticket (Engineering team assignment & SLA determination)
+     Step 8: confidence_gate (Evaluation of model uncertainty for human review)
+     Step 9: explanation_layer (Synthesis of verifiable audit summary)
 
-Executes an explicit, ordered pipeline of tools and records every step in `agent_trace`:
-1. normalize_and_extract(text)
-2. classify_ticket(text, asset_type)
-3. safety_guardrail(text, ml_severity)  [escalate-only, never downgrades]
-4. lookup_runbook(category, text)       [TF-IDF cosine similarity over local runbook.json]
-5. check_duplicates(text, asset_type, recent_tickets)
-6. compute_priority(...)
-7. route_ticket(...)
-8. confidence_gate(...)                 [sets needs_human_review when uncertain]
+2. WHY THIS FILE IS NEEDED:
+   In industrial plant operations, pure machine learning is uncalibrated and risky,
+   while pure hardcoded rules cannot handle natural language variance. This file
+   fuses ML predictions with un-downgradable safety guardrails and standard operating
+   procedures (SOPs), recording every step in an inspectable audit trace (`agent_trace`).
+
+3. WHICH OTHER FILES USE IT:
+   - backend/app.py: Instantiates `TicketTriageAgent` on startup and calls `agent.run()`.
+   - tests/test_triage.py: Directly tests agent guardrails, negation, and triage outputs.
+   - tests/test_pdf_report.py: Runs tickets through the agent to test PDF report generation.
+
+4. WHAT INPUT IT RECEIVES:
+   - `description` (str): Free-text maintenance observation from control room.
+   - `asset_type` (str): 'solar', 'wind', 'hydro', or 'grid'.
+   - `ticket_id` (str | None): Optional unique ticket identifier.
+
+5. WHAT OUTPUT IT PRODUCES:
+   - A complete structured dictionary containing category, final severity, priority score,
+     assigned team, SLA, extracted equipment IDs, probable causes, next troubleshooting steps,
+     and the complete 9-step `agent_trace`.
+===============================================================================
 """
 
 from __future__ import annotations
@@ -36,6 +62,7 @@ MODELS_DIR = BASE_DIR / "models"
 
 
 def resolve_models_dir() -> Path:
+    """Find the models directory across local, packaged, or Vercel lambda runtime paths."""
     if (MODELS_DIR / "category_pipeline.joblib").exists():
         return MODELS_DIR
     for candidate in [
@@ -49,6 +76,7 @@ def resolve_models_dir() -> Path:
 
 
 def resolve_runbook_path() -> Path:
+    """Find data/runbook.json across local, packaged, or Vercel lambda runtime paths."""
     if RUNBOOK_PATH.exists():
         return RUNBOOK_PATH
     for candidate in [
@@ -60,11 +88,19 @@ def resolve_runbook_path() -> Path:
             return candidate
     return RUNBOOK_PATH
 
-CATEGORY_CONF_THRESHOLD = 0.45
-SEVERITY_CONF_THRESHOLD = 0.40
-TOP2_MARGIN_THRESHOLD = 0.12
 
-# Deterministic hazard rules: (rule_id, target_min_severity, keywords, reason)
+# =============================================================================
+# CONFIDENCE THRESHOLDS (TOOL STEP 8)
+# =============================================================================
+CATEGORY_CONF_THRESHOLD = 0.45    # Below 45% category probability triggers human review
+SEVERITY_CONF_THRESHOLD = 0.40    # Below 40% severity probability triggers human review
+TOP2_MARGIN_THRESHOLD = 0.12      # Less than 12% probability gap between 1st & 2nd class triggers review
+
+# =============================================================================
+# DETERMINISTIC SAFETY RULES (TOOL STEP 3)
+# =============================================================================
+# Rule tuple structure: (rule_id, target_min_severity, keywords, reason)
+# STRICT SAFETY POLICY: Escalate-only. Rules can raise severity, but NEVER downgrade.
 SAFETY_RULES: list[tuple[str, str, list[str], str]] = [
     (
         "SAF-01-FIRE-ARC",
@@ -86,11 +122,32 @@ SAFETY_RULES: list[tuple[str, str, list[str], str]] = [
     ),
 ]
 
+# Negation prefixes checked in a 15-character window immediately preceding a keyword
 NEGATION_PREFIXES = ("no ", "not ", "without ", "no sign of ", "absent ")
 
 
 def _keyword_present_unnegated(text_lower: str, kw: str) -> bool:
-    """Return True if keyword appears and is not immediately preceded by a negation."""
+    """
+    1. WHAT IT DOES:
+       Checks whether a safety hazard keyword appears in the text without being negated.
+
+    2. WHY WE NEED IT:
+       Prevents false safety alarms. For example: "Routine walkdown; no smoke observed"
+       contains the word "smoke", but is explicitly negated by "no ". It must NOT trigger
+       an emergency fire escalation.
+
+    3. PARAMETERS:
+       - text_lower (str): Lowercase description text.
+       - kw (str): Safety keyword to search for (e.g. "smoke").
+
+    4. RETURNS:
+       bool: True if an unnegated instance of the keyword exists; False if absent or negated.
+
+    5. HOW IT WORKS INTERNALLY:
+       Finds occurrences of `kw`. For each occurrence, inspects a 15-character preceding
+       text window. If any prefix in `NEGATION_PREFIXES` ends in that window, it is treated
+       as negated and skipped. If an unnegated match is found, returns True immediately.
+    """
     idx = text_lower.find(kw)
     while idx != -1:
         window = text_lower[max(0, idx - 15):idx]
@@ -101,7 +158,10 @@ def _keyword_present_unnegated(text_lower: str, kw: str) -> bool:
 
 
 class TicketTriageAgent:
-    """Hybrid ML + deterministic rule/tool triage agent."""
+    """
+    Hybrid Machine Learning + Rule/Tool-based Maintenance Ticket Triage Agent.
+    Coordinates the 9-step pipeline and manages in-memory recent ticket history.
+    """
 
     def __init__(
         self,
@@ -117,17 +177,18 @@ class TicketTriageAgent:
 
     @classmethod
     def from_disk(cls, models_dir: Path | None = None) -> "TicketTriageAgent":
+        """
+        Loads serialized pipelines from disk. In serverless read-only environments
+        like Vercel, if model files are missing, it trains them dynamically in /tmp.
+        """
         target_models_dir = models_dir or resolve_models_dir()
         cat_path = target_models_dir / "category_pipeline.joblib"
         sev_path = target_models_dir / "severity_pipeline.joblib"
         if not cat_path.exists() or not sev_path.exists():
-            # In serverless environments (e.g. Vercel), the filesystem is read-only outside /tmp.
-            # Train in-memory or save only if the target directory is writable.
             from backend.train import train_and_save_models
             try:
                 cat_pipe, sev_pipe = train_and_save_models(models_dir=target_models_dir)
             except (OSError, PermissionError):
-                # Target models directory is read-only; train in memory without disk save
                 import tempfile
                 with tempfile.TemporaryDirectory() as tmp_dir:
                     cat_pipe, sev_pipe = train_and_save_models(models_dir=Path(tmp_dir))
@@ -137,12 +198,29 @@ class TicketTriageAgent:
             sev_pipeline=joblib.load(sev_path),
         )
 
+    # -------------------------------------------------------------------------
+    # STEP 1: normalize_and_extract
+    # -------------------------------------------------------------------------
     def normalize_and_extract(self, text: str) -> dict[str, Any]:
-        """Tool 1: Clean text and extract equipment IDs & site hints."""
+        """Tool 1: Normalizes text and extracts equipment IDs & site hints using regex."""
         return extract_entities(text)
 
-    def _top_contributing_terms(self, pipeline: Pipeline, clean_text: str, asset_type: str, pred_class: str, top_k: int = 5) -> list[dict[str, Any]]:
-        """Extract top positive contributing word n-grams for explainability."""
+    # -------------------------------------------------------------------------
+    # STEP 2: classify_ticket
+    # -------------------------------------------------------------------------
+    def _top_contributing_terms(
+        self,
+        pipeline: Pipeline,
+        clean_text: str,
+        asset_type: str,
+        pred_class: str,
+        top_k: int = 5,
+    ) -> list[dict[str, Any]]:
+        """
+        Calculates positive feature contributions for explainability.
+        Multiplies transformed TF-IDF feature weights by the Logistic Regression
+        coefficients for the winning class: contribution = tfidf_value * coef.
+        """
         try:
             pre = pipeline.named_steps["features"]
             clf = pipeline.named_steps["clf"]
@@ -171,7 +249,11 @@ class TicketTriageAgent:
             return []
 
     def classify_ticket(self, clean_text: str, asset_type: str) -> dict[str, Any]:
-        """Tool 2: Predict category & severity with probabilities and top contributing terms."""
+        """
+        Tool 2: Evaluates both scikit-learn models on the input features.
+        Computes softmax probabilities (`predict_proba`), top-2 category margin,
+        and extracts top positive explainability tokens.
+        """
         assert self.cat_pipeline is not None and self.sev_pipeline is not None
         X_df = pd.DataFrame([{"clean_text": clean_text, "asset_type": asset_type}])
 
@@ -201,8 +283,15 @@ class TicketTriageAgent:
             "top_contributing_terms": top_terms,
         }
 
+    # -------------------------------------------------------------------------
+    # STEP 3: safety_guardrail
+    # -------------------------------------------------------------------------
     def safety_guardrail(self, raw_text: str, ml_severity: str) -> dict[str, Any]:
-        """Tool 3: Deterministic escalate-only safety guardrail. Never downgrades severity."""
+        """
+        Tool 3: Enforces deterministic safety rules with negation checking.
+        ESCALATE-ONLY POLICY: If hazardous keywords are present, severity is
+        raised to at least the rule's minimum level. It is NEVER downgraded.
+        """
         text_lower = raw_text.lower()
         final_severity = ml_severity
         fired_rules: list[dict[str, str]] = []
@@ -230,8 +319,15 @@ class TicketTriageAgent:
             "fired_rules": fired_rules,
         }
 
+    # -------------------------------------------------------------------------
+    # STEP 4: lookup_runbook
+    # -------------------------------------------------------------------------
     def lookup_runbook(self, category: str, clean_text: str) -> dict[str, Any]:
-        """Tool 4: Retrieve relevant probable causes and next actions via TF-IDF cosine similarity."""
+        """
+        Tool 4: Retrieves Standard Operating Procedures (SOPs) from data/runbook.json.
+        Uses TF-IDF Cosine Similarity between the ticket text and the keyword corpus
+        of category sub-entries to select the closest matching probable causes and actions.
+        """
         cat_block = self.runbook.get(category)
         if not cat_block:
             return {
@@ -267,8 +363,20 @@ class TicketTriageAgent:
             "next_actions": best["next_actions"],
         }
 
-    def check_duplicates(self, clean_text: str, asset_type: str, recent_tickets: list[dict[str, str]] | None = None) -> dict[str, Any]:
-        """Tool 5: Flag probable duplicate or repeat faults using token Jaccard similarity."""
+    # -------------------------------------------------------------------------
+    # STEP 5: check_duplicates
+    # -------------------------------------------------------------------------
+    def check_duplicates(
+        self,
+        clean_text: str,
+        asset_type: str,
+        recent_tickets: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Tool 5: Evaluates Token Jaccard Similarity J(A, B) = |A ∩ B| / |A ∪ B|
+        against tickets evaluated in the active server session buffer (last 50).
+        If similarity >= 0.65 for the same asset type, marks ticket as repeat fault.
+        """
         pool = recent_tickets if recent_tickets is not None else self.recent_tickets
         tokens_a = set(re.findall(r"[a-z0-9\-]+", clean_text))
         matches: list[dict[str, Any]] = []
@@ -289,8 +397,20 @@ class TicketTriageAgent:
             "matched_tickets": matches[:3],
         }
 
-    def run(self, description: str, asset_type: str, ticket_id: str | None = None, record_history: bool = True) -> dict[str, Any]:
-        """Execute the full triage agent pipeline and return structured result + trace."""
+    # -------------------------------------------------------------------------
+    # MAIN PIPELINE EXECUTION
+    # -------------------------------------------------------------------------
+    def run(
+        self,
+        description: str,
+        asset_type: str,
+        ticket_id: str | None = None,
+        record_history: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Executes all 9 tools sequentially, building the comprehensive response
+        and appending structured step outputs into `agent_trace`.
+        """
         trace: list[dict[str, Any]] = []
         asset = asset_type.strip().lower()
 
@@ -437,6 +557,7 @@ class TicketTriageAgent:
 
         structured["agent_trace"] = trace
 
+        # In-memory history recording for session duplicate checking
         if record_history:
             self.recent_tickets.append({
                 "ticket_id": structured["ticket_id"],

@@ -1,6 +1,25 @@
 """
-Vercel Serverless Function entrypoint for FastAPI.
-Exposes the ASGI app instance directly for Vercel Python runtime.
+===============================================================================
+FILE: api/index.py
+===============================================================================
+1. WHAT THIS FILE DOES:
+   Secondary Vercel Serverless Function entrypoint. Exposes the ASGI `app` object
+   from inside the `api/` directory for Vercel environments that scan `api/*.py`.
+
+2. WHY THIS FILE IS NEEDED:
+   Provides backwards compatibility with legacy Vercel Python builders that
+   look inside `api/index.py` while ensuring `sys.path` contains the repository
+   root for absolute imports (`backend.*`).
+
+3. WHICH OTHER FILES USE IT:
+   - Vercel runtime fallback.
+
+4. WHAT INPUT IT RECEIVES:
+   - ASGI HTTP connection events.
+
+5. WHAT OUTPUT IT PRODUCES:
+   - Exports the ASGI `app` callable from `backend.app`.
+===============================================================================
 """
 
 from __future__ import annotations

@@ -1,8 +1,36 @@
 """
-PDF Report Generator for Greenko O&M Maintenance Intelligence.
+===============================================================================
+FILE: backend/pdf_generator.py
+===============================================================================
+1. WHAT THIS FILE DOES:
+   Enterprise Industrial PDF Report Generator for Greenko O&M Maintenance Intelligence.
+   Generates an official, publication-quality 5-page PDF engineering assessment
+   document from live AI ticket triage results using ReportLab:
+     - Page 1: Executive Cover Page & Core Triage Decision Summary
+     - Page 2: Safety & Compliance Assessment + Guardrail Audit
+     - Page 3: Technical Root Cause Analysis + ML Confidence Breakdown
+     - Page 4: Work Order Plan, Recommended Actions & Spare Parts
+     - Page 5: Escalation Matrix, SLA Commitments & Sign-off Blocks
 
-Generates a professional 5-page enterprise industrial assessment report
-using ReportLab and in-memory BytesIO buffers.
+2. WHY THIS FILE IS NEEDED:
+   Industrial maintenance teams, plant managers, and regulatory safety bodies
+   require standardized, auditable physical/digital paper trails before field
+   technicians enter high-voltage or hazardous environments (lockout/tagout).
+   This module turns AI model predictions and priority scores into an official
+   engineering document without needing headless browsers or external print servers.
+
+3. WHICH OTHER FILES USE IT:
+   - backend/app.py: Calls `generate_maintenance_report_pdf()` in endpoint
+     POST /api/reports/ticket-pdf.
+   - tests/test_pdf_report.py: Validates PDF generation, page count, and byte stream.
+
+4. WHAT INPUT IT RECEIVES:
+   - ticket_data (dict): Dictionary of validated triage outputs (ticket_id, asset_type,
+     category, severity, priority_score, sla_hours, guardrail flags, equipment IDs, etc.)
+
+5. WHAT OUTPUT IT PRODUCES:
+   - bytes: In-memory binary PDF document stream ready for HTTP transmission or disk storage.
+===============================================================================
 """
 
 from __future__ import annotations
