@@ -1,2458 +1,521 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GREenko | Maintenance Intelligence &amp; Ticket Prioritization</title>
-  <!-- Google Fonts: Inter -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maintenance Ticket Prioritization Agent | Greenko O&M</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-page: #F7F9FC;
-      --bg-surface: #FFFFFF;
-      --bg-subtle: #F1F4F9;
-      --bg-hover: #EBF0F6;
-      
-      --border-color: #E2E8F0;
-      --border-focus: #10B981;
-      
-      --text-main: #0F172A;
-      --text-secondary: #475569;
-      --text-muted: #64748B;
-      --text-light: #94A3B8;
-      
-      /* Brand Emerald Theme */
       --primary: #059669;
       --primary-hover: #047857;
-      --primary-subtle: #ECFDF5;
-      --primary-border: #A7F3D0;
-      --primary-dark: #064E3B;
-      
-      /* Secondary Slate / Navy */
-      --navy: #0F2D3A;
-      --navy-light: #1E3A8A;
-      --navy-subtle: #F0F4F8;
-      
-      /* Semantic Status */
-      --sev-crit-bg: #FEF2F2;
-      --sev-crit-text: #991B1B;
-      --sev-crit-border: #FECACA;
-      --sev-crit-solid: #DC2626;
-      
-      --sev-high-bg: #FFF7ED;
-      --sev-high-text: #C2410C;
-      --sev-high-border: #FED7AA;
-      --sev-high-solid: #EA580C;
-      
-      --sev-med-bg: #FEFCE8;
-      --sev-med-text: #854D0E;
-      --sev-med-border: #FEF08A;
-      --sev-med-solid: #CA8A04;
-      
-      --sev-low-bg: #F0FDF4;
+      --primary-subtle: #ecfdf5;
+      --primary-border: #a7f3d0;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 12px;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+
+      --sev-low-bg: #f0fdf4;
       --sev-low-text: #166534;
-      --sev-low-border: #BBF7D0;
-      --sev-low-solid: #16A34A;
-      
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
-      
-      --sidebar-width: 260px;
+      --sev-low-border: #bbf7d0;
+
+      --sev-med-bg: #fefce8;
+      --sev-med-text: #854d0e;
+      --sev-med-border: #fef08a;
+
+      --sev-high-bg: #fff7ed;
+      --sev-high-text: #c2410c;
+      --sev-high-border: #fed7aa;
+
+      --sev-crit-bg: #fef2f2;
+      --sev-crit-text: #991b1b;
+      --sev-crit-border: #fecaca;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    
     body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background-color: var(--bg-page);
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: var(--bg);
       color: var(--text-main);
+      line-height: 1.5;
+      padding: 32px 16px;
+    }
+
+    .container {
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
       display: flex;
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* Layout: Sidebar */
-    aside.app-sidebar {
-      width: var(--sidebar-width);
-      background-color: #FFFFFF;
-      border-right: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      z-index: 40;
-      transition: transform 0.25s ease;
-    }
-
-    .brand-header {
-      padding: 24px 20px;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .brand-logo-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #059669 0%, #064E3B 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #FFFFFF;
-      font-weight: 800;
-      font-size: 19px;
-      box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);
-      flex-shrink: 0;
-    }
-
-    .brand-titles h1 {
-      font-size: 17px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-      color: var(--text-main);
-      line-height: 1.2;
-    }
-    .brand-titles h1 span {
-      color: var(--primary);
-    }
-    .brand-titles p {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      margin-top: 2px;
-    }
-
-    .nav-list {
-      list-style: none;
-      padding: 16px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      flex-grow: 1;
-      overflow-y: auto;
-    }
-
-    .nav-item-btn {
-      width: 100%;
-      text-align: left;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 11px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 13.5px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      background: transparent;
-      border: 1px solid transparent;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .nav-item-btn:hover {
-      background-color: var(--bg-hover);
-      color: var(--text-main);
-    }
-
-    .nav-item-btn.active {
-      background-color: var(--primary-subtle);
-      color: var(--primary-dark);
-      border-color: var(--primary-border);
-      font-weight: 600;
-    }
-
-    .nav-item-btn svg {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-      stroke-width: 2;
-    }
-
-    .sidebar-footer {
-      padding: 16px 20px;
-      border-top: 1px solid var(--border-color);
-      font-size: 12px;
-      color: var(--text-light);
-      background-color: #FAFCFE;
-    }
-    .sidebar-footer .status-row {
-      display: flex;
-      align-items: center;
       justify-content: space-between;
-      margin-bottom: 4px;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
     }
-    .sidebar-footer .dot {
+    .brand-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-badge {
+      background: var(--primary-subtle);
+      color: var(--primary);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--primary-border);
+    }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.825rem;
+      color: var(--text-muted);
+      background: #fff;
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    .status-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      display: inline-block;
-      margin-right: 6px;
-      background-color: #10B981;
+      background: #10b981;
     }
 
-    /* Main Content Area */
-    .app-main-wrap {
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      height: 100vh;
-      overflow-y: auto;
-    }
-
-    header.app-topbar {
-      background-color: #FFFFFF;
-      border-bottom: 1px solid var(--border-color);
-      padding: 16px 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 30;
-    }
-
-    .topbar-titles h2 {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text-main);
-      letter-spacing: -0.2px;
-    }
-    .topbar-titles p {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-      background-color: var(--bg-subtle);
-      border: 1px solid var(--border-color);
-      color: var(--text-secondary);
-    }
-    .status-pill.ready {
-      background-color: #ECFDF5;
-      color: #065F46;
-      border-color: #A7F3D0;
-    }
-    .status-pill.waking {
-      background-color: #FFFBEB;
-      color: #92400E;
-      border-color: #FDE68A;
-    }
-    .status-pill.error {
-      background-color: #FEF2F2;
-      color: #991B1B;
-      border-color: #FECACA;
-    }
-
-    .mobile-menu-btn {
-      display: none;
-      background: transparent;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 8px;
-      color: var(--text-secondary);
-      cursor: pointer;
-    }
-
-    /* Container */
-    .page-container {
-      padding: 28px 32px 48px;
-      max-width: 1360px;
-      width: 100%;
-      margin: 0 auto;
-    }
-
-    /* Page View Switching */
-    .view-page { display: none; }
-    .view-page.active { display: block; animation: fadeIn 0.15s ease; }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Enterprise Components: Cards */
-    .card {
-      background-color: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-sm);
-      padding: 24px;
-      margin-bottom: 24px;
-    }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border-color);
-    }
-    
-    .card-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .card-desc {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-top: 3px;
-    }
-
-    /* Stats Grid */
-    .kpi-row {
+    /* Grid layout */
+    .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .kpi-card {
-      background: #FFFFFF;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 18px 20px;
-      box-shadow: var(--shadow-sm);
-    }
-    
-    .kpi-card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-    .kpi-card .k-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
-    .kpi-card .k-value {
-      font-size: 26px;
-      font-weight: 700;
-      color: var(--text-main);
-      letter-spacing: -0.5px;
-      line-height: 1.1;
-    }
-    .kpi-card .k-sub {
-      font-size: 12px;
-      color: var(--text-secondary);
-      margin-top: 6px;
-    }
-
-    /* Badges */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.2px;
-      line-height: 1.3;
-      text-transform: uppercase;
-    }
-    .badge-critical {
-      background-color: var(--sev-crit-bg);
-      color: var(--sev-crit-text);
-      border: 1px solid var(--sev-crit-border);
-    }
-    .badge-high {
-      background-color: var(--sev-high-bg);
-      color: var(--sev-high-text);
-      border: 1px solid var(--sev-high-border);
-    }
-    .badge-medium {
-      background-color: var(--sev-med-bg);
-      color: var(--sev-med-text);
-      border: 1px solid var(--sev-med-border);
-    }
-    .badge-low {
-      background-color: var(--sev-low-bg);
-      color: var(--sev-low-text);
-      border: 1px solid var(--sev-low-border);
-    }
-    .badge-warning {
-      background-color: #FEF3C7;
-      color: #92400E;
-      border: 1px solid #FDE68A;
-    }
-    .badge-info {
-      background-color: #EFF6FF;
-      color: #1E40AF;
-      border: 1px solid #BFDBFE;
-    }
-
-    /* Grid Layouts */
-    .grid-2col {
-      display: grid;
-      grid-template-columns: 1.15fr 1fr;
+      grid-template-columns: 1.1fr 1fr;
       gap: 24px;
     }
-
-    /* Forms */
-    .form-group {
-      margin-bottom: 18px;
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
     }
-    .form-label {
-      display: block;
-      font-size: 13px;
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
       font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 6px;
-    }
-    .form-hint {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    .form-select, .form-textarea, .form-input {
-      width: 100%;
-      background-color: #FFFFFF;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 10px 14px;
-      font-family: inherit;
-      font-size: 14px;
-      color: var(--text-main);
-      transition: all 0.15s ease;
-    }
-    .form-select:focus, .form-textarea:focus, .form-input:focus {
-      outline: none;
-      border-color: var(--border-focus);
-      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
-    }
-    .form-textarea {
-      min-height: 120px;
-      resize: vertical;
-      line-height: 1.5;
-    }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      font-family: inherit;
-      font-size: 13.5px;
-      font-weight: 600;
-      padding: 10px 18px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: all 0.15s ease;
-      border: 1px solid transparent;
-    }
-    .btn-primary {
-      background-color: var(--primary);
-      color: #FFFFFF;
-      box-shadow: 0 1px 2px rgba(5, 150, 105, 0.2);
-    }
-    .btn-primary:hover:not(:disabled) {
-      background-color: var(--primary-hover);
-    }
-    .btn-primary:disabled {
-      opacity: 0.65;
-      cursor: not-allowed;
-    }
-    .btn-secondary {
-      background-color: var(--bg-surface);
-      border-color: var(--border-color);
-      color: var(--text-secondary);
-    }
-    .btn-secondary:hover {
-      background-color: var(--bg-hover);
-      color: var(--text-main);
-    }
-    .btn-sm {
-      padding: 5px 10px;
-      font-size: 11.5px;
-      border-radius: 6px;
-      gap: 5px;
-    }
-    .spinner-sm {
-      width: 13px;
-      height: 13px;
-      border: 2px solid rgba(255, 255, 255, 0.35);
-      border-top-color: #FFFFFF;
-      border-radius: 50%;
-      animation: spin-fast 0.6s linear infinite;
-      display: inline-block;
-      vertical-align: middle;
-    }
-    .spinner-sm.dark {
-      border: 2px solid rgba(15, 45, 58, 0.2);
-      border-top-color: var(--navy);
-    }
-    @keyframes spin-fast {
-      to { transform: rotate(360deg); }
-    }
-    .result-alert.alert-success {
-      background-color: #F0FDF4;
-      border: 1px solid #BBF7D0;
-      color: #166534;
-    }
-    .report-action-bar {
-      margin-bottom: 14px;
+      margin-bottom: 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 12px 16px;
-      background: #FFFFFF;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-sm);
     }
 
-    /* Demo Ticket Selector Cards */
-    .demo-cards-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-      margin-top: 10px;
-    }
-
-    .demo-ticket-card {
-      background-color: #FFFFFF;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-      text-align: left;
-      cursor: pointer;
-      transition: all 0.15s ease;
+    /* Demo tickets section */
+    .demo-list {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-    }
-    .demo-ticket-card:hover {
-      border-color: var(--primary);
-      background-color: var(--primary-subtle);
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-sm);
-    }
-    .demo-ticket-card .demo-tag {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .demo-ticket-card .demo-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-main);
-    }
-    .demo-ticket-card .demo-snip {
-      font-size: 11.5px;
-      color: var(--text-muted);
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-    }
-
-    /* Results Layout */
-    .result-alert {
-      padding: 14px 18px;
-      border-radius: var(--radius-sm);
-      font-size: 13.5px;
-      margin-bottom: 18px;
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      line-height: 1.45;
-    }
-    .result-alert.alert-warning {
-      background-color: #FFFBEB;
-      border: 1px solid #FCD34D;
-      color: #92400E;
-    }
-    .result-alert.alert-escalation {
-      background-color: #FEF2F2;
-      border: 1px solid #FECACA;
-      color: #991B1B;
-    }
-
-    /* Decision Summary Card */
-    .decision-banner {
-      background: linear-gradient(to right, #FFFFFF, #F8FAFC);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 20px;
+      gap: 8px;
       margin-bottom: 20px;
     }
-    .decision-top {
+    .demo-btn {
+      text-align: left;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
+      align-items: center;
+    }
+    .demo-btn:hover {
+      background: #ffffff;
+      border-color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .demo-btn span.badge {
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      color: #334155;
+    }
+
+    /* Form */
+    .form-group {
       margin-bottom: 16px;
     }
-    
-    .priority-meter-wrap {
-      margin: 16px 0 10px;
-    }
-    .priority-bar-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
+    label {
+      display: block;
+      font-size: 0.85rem;
       font-weight: 600;
-      color: var(--text-secondary);
+      color: #334155;
       margin-bottom: 6px;
     }
-    .priority-track {
-      height: 10px;
-      background-color: #E2E8F0;
-      border-radius: 999px;
-      overflow: hidden;
-    }
-    .priority-fill {
-      height: 100%;
-      border-radius: 999px;
-      transition: width 0.4s ease;
-    }
-
-    .decision-grid-meta {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-      gap: 12px;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border-color);
-    }
-    .meta-box {
-      background: #FFFFFF;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
+    select, textarea, input {
+      width: 100%;
       padding: 10px 12px;
-    }
-    .meta-box .m-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
-    .meta-box .m-val { font-size: 14px; font-weight: 700; color: var(--text-main); margin-top: 2px; }
-
-    /* Highlights */
-    .highlight-card {
-      background-color: #FFFFFF;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--text-secondary);
-    }
-    mark.term-hit {
-      background-color: #D1FAE5;
-      color: #065F46;
-      font-weight: 600;
-      padding: 2px 5px;
-      border-radius: 4px;
-      border: 1px solid #A7F3D0;
-    }
-
-    /* Lists */
-    .action-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .action-list li {
-      position: relative;
-      padding-left: 24px;
-      font-size: 13.5px;
-      color: var(--text-secondary);
-      line-height: 1.45;
-    }
-    .action-list li::before {
-      content: "";
-      position: absolute;
-      left: 6px;
-      top: 8px;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background-color: var(--primary);
-    }
-
-    /* Accordion / Trace */
-    details.agent-trace-accordion {
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      background-color: #FFFFFF;
-      overflow: hidden;
-      margin-top: 16px;
-    }
-    details.agent-trace-accordion summary {
-      padding: 14px 18px;
-      font-size: 14px;
-      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      background: #ffffff;
       color: var(--text-main);
+      transition: border-color 0.15s ease;
+    }
+    select:focus, textarea:focus, input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 110px;
+    }
+
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
       cursor: pointer;
+      transition: background 0.15s ease;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      user-select: none;
-      background-color: #FAFCFE;
-    }
-    details.agent-trace-accordion summary:hover {
-      background-color: var(--bg-hover);
-    }
-    .trace-body-container {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      background-color: #F8FAFC;
-      border-top: 1px solid var(--border-color);
-    }
-
-    .trace-step-item {
-      background-color: #FFFFFF;
-      border: 1px solid var(--border-color);
-      border-left: 4px solid var(--primary);
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-      padding: 12px 14px;
-    }
-    .trace-step-item.escalated {
-      border-left-color: var(--sev-crit-solid);
-    }
-    .trace-step-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
-    }
-    .trace-step-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-main);
-    }
-    .trace-step-desc {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-    }
-    .trace-step-payload {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11.5px;
-      background-color: #F1F5F9;
-      color: #1E293B;
-      padding: 8px 10px;
-      border-radius: 6px;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-
-    /* Tables */
-    .table-responsive {
-      width: 100%;
-      overflow-x: auto;
-      margin-top: 12px;
-    }
-    table.data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      text-align: left;
-    }
-    table.data-table th, table.data-table td {
-      padding: 10px 14px;
-      border: 1px solid var(--border-color);
-    }
-    table.data-table th {
-      background-color: #F8FAFC;
-      font-weight: 600;
-      color: var(--text-secondary);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-    table.data-table tbody tr:hover {
-      background-color: #FAFCFE;
-    }
-    table.data-table tr.highlighted-row {
-      background-color: var(--primary-subtle);
-    }
-
-    /* Heatmap styling for Confusion Matrix */
-    .heatmap-cell {
-      text-align: center;
-      font-weight: 600;
-      border-radius: 4px;
-      padding: 8px !important;
-    }
-    .cell-diag {
-      background-color: #DCFCE7 !important;
-      color: #14532D !important;
-    }
-    .cell-off {
-      background-color: #FFF1F2 !important;
-      color: #9F1239 !important;
-    }
-    .cell-zero {
-      background-color: #F8FAFC !important;
-      color: #94A3B8 !important;
-      font-weight: 400;
-    }
-
-    /* Empty State */
-    .empty-state {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--text-muted);
-    }
-    .empty-state-icon {
-      width: 52px;
-      height: 52px;
-      margin: 0 auto 16px;
-      border-radius: 50%;
-      background-color: var(--bg-subtle);
-      display: flex;
-      align-items: center;
       justify-content: center;
-      color: var(--text-light);
+      align-items: center;
+      gap: 8px;
     }
-    .empty-state h3 {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 6px;
+    .btn-submit:hover {
+      background: var(--primary-hover);
     }
-    .empty-state p {
-      font-size: 13.5px;
-      max-width: 440px;
-      margin: 0 auto;
-      line-height: 1.5;
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
-    /* Workflow Cards */
-    .workflow-steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 12px;
-      margin: 16px 0;
-    }
-    .wf-step-card {
-      background: #FFFFFF;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      position: relative;
-    }
-    .wf-step-num {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--primary);
-      text-transform: uppercase;
-    }
-    .wf-step-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-main);
-    }
-    .wf-step-desc {
-      font-size: 12px;
+    /* Results */
+    .placeholder-result {
+      text-align: center;
+      padding: 60px 20px;
       color: var(--text-muted);
-      line-height: 1.35;
+    }
+    .placeholder-result svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+      stroke: #cbd5e1;
     }
 
-    /* Formula Breakdown Box */
-    .formula-box {
-      background-color: #F8FAFC;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 16px;
+    .result-section {
+      display: none;
+    }
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .sev-badge {
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+    .sev-low { background: var(--sev-low-bg); color: var(--sev-low-text); border-color: var(--sev-low-border); }
+    .sev-medium { background: var(--sev-med-bg); color: var(--sev-med-text); border-color: var(--sev-med-border); }
+    .sev-high { background: var(--sev-high-bg); color: var(--sev-high-text); border-color: var(--sev-high-border); }
+    .sev-critical { background: var(--sev-crit-bg); color: var(--sev-crit-text); border-color: var(--sev-crit-border); }
+
+    .result-row {
+      margin-bottom: 14px;
+    }
+    .result-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .result-val {
+      font-size: 0.95rem;
+      color: var(--text-main);
+    }
+    .code-val {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      color: var(--navy);
-      margin: 12px 0 16px;
-      line-height: 1.6;
+      font-size: 0.9rem;
+      background: var(--bg);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      display: inline-block;
     }
-    
-    .weights-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-      margin: 16px 0;
-    }
-    .weight-card {
-      background: #FFFFFF;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-    }
-    .weight-card .w-pct { font-size: 18px; font-weight: 700; color: var(--primary); }
-    .weight-card .w-name { font-size: 12px; font-weight: 600; color: var(--text-main); margin-top: 2px; }
-    .weight-card .w-desc { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
 
-    /* Responsive */
-    @media (max-width: 960px) {
-      aside.app-sidebar {
-        position: fixed;
-        transform: translateX(-100%);
-      }
-      aside.app-sidebar.open {
-        transform: translateX(0);
-      }
-      .mobile-menu-btn {
-        display: inline-flex;
-      }
-      .grid-2col {
-        grid-template-columns: 1fr;
-      }
-      .page-container {
-        padding: 20px 16px 36px;
-      }
-      header.app-topbar {
-        padding: 14px 16px;
-      }
+    .alert-box {
+      background: var(--sev-crit-bg);
+      border: 1px solid var(--sev-crit-border);
+      color: var(--sev-crit-text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    footer {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
     }
   </style>
 </head>
 <body>
-
-  <!-- Persistent Sidebar -->
-  <aside class="app-sidebar" id="appSidebar">
-    <div class="brand-header">
-      <div class="brand-logo-icon">G</div>
-      <div class="brand-titles">
-        <h1>GRE<span>enko</span></h1>
-        <p>Maintenance Intelligence</p>
+  <div class="container">
+    <header>
+      <div class="brand-title">
+        <span>⚡ Greenko O&M</span>
+        <span class="brand-badge">Ticket Prioritization Agent</span>
       </div>
-    </div>
-
-    <ul class="nav-list">
-      <li>
-        <button class="nav-item-btn active" onclick="switchNav('dashboard', this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-          Dashboard
-        </button>
-      </li>
-      <li>
-        <button class="nav-item-btn" onclick="switchNav('triage', this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
-          AI Ticket Triage
-        </button>
-      </li>
-      <li>
-        <button class="nav-item-btn" onclick="switchNav('history', this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          Ticket History
-        </button>
-      </li>
-      <li>
-        <button class="nav-item-btn" onclick="switchNav('analytics', this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-          Model Analytics
-        </button>
-      </li>
-      <li>
-        <button class="nav-item-btn" onclick="switchNav('runbook', this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-          Runbook &amp; Actions
-        </button>
-      </li>
-      <li>
-        <button class="nav-item-btn" onclick="switchNav('system', this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-          System Architecture
-        </button>
-      </li>
-    </ul>
-
-    <div class="sidebar-footer">
-      <div class="status-row">
-        <span>Engine Status</span>
-        <span id="sidebarStatusText" style="font-weight:600; color:var(--text-main);">Checking...</span>
-      </div>
-      <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Greenko O&amp;M v1.0.0 &bull; Offline Mode</div>
-    </div>
-  </aside>
-
-  <!-- Main Wrap -->
-  <div class="app-main-wrap">
-    
-    <!-- Topbar -->
-    <header class="app-topbar">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Toggle Navigation">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-        </button>
-        <div class="topbar-titles">
-          <h2 id="pageHeading">Maintenance Operations Overview</h2>
-          <p id="pageSubheading">Monitor, classify and prioritize maintenance issues across renewable-energy assets.</p>
-        </div>
-      </div>
-
-      <div class="topbar-actions">
-        <div id="backendPill" class="status-pill waking">
-          <span class="dot" id="backendDot" style="background-color:#EAB308;"></span>
-          <span id="backendPillText">Connecting...</span>
-        </div>
+      <div class="status-pill">
+        <span class="status-dot"></span>
+        <span>TF-IDF + KNN Active</span>
       </div>
     </header>
 
-    <!-- Page Content Container -->
-    <main class="page-container">
-
-      <!-- ================= PAGE 1: DASHBOARD ================= -->
-      <section id="page-dashboard" class="view-page active">
-        
-        <div class="kpi-row">
-          <div class="kpi-card">
-            <div class="kpi-card-header">
-              <span class="k-label">Operational Status</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-            </div>
-            <div class="k-value" id="dashEngineState" style="color:#059669; font-size:20px;">Ready</div>
-            <div class="k-sub">Hybrid ML + Guardrail Pipeline</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-card-header">
-              <span class="k-label">Dataset Trained</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-            </div>
-            <div class="k-value" id="dashTotalRows">426 rows</div>
-            <div class="k-sub">6 bundled + 420 synthetic (seed=42)</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-card-header">
-              <span class="k-label">5-Fold Critical Recall</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-            </div>
-            <div class="k-value" id="dashCritRecall">94.0%</div>
-            <div class="k-sub">Catches true safety &amp; severe trips</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-card-header">
-              <span class="k-label">Under-Triage Rate</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-            </div>
-            <div class="k-value" id="dashUnderTriage">3.5%</div>
-            <div class="k-sub">Predicted &lt; actual severity</div>
-          </div>
+    <div class="grid">
+      <!-- Input Panel -->
+      <div class="card">
+        <div class="card-title">
+          <span>Maintenance Ticket Triage</span>
         </div>
 
-        <div class="grid-2col">
-          <!-- Left: Overview & Quick Action -->
-          <div>
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <h3 class="card-title">Live Triage Workflow</h3>
-                  <p class="card-desc">End-to-end processing pipeline for incoming shift tickets</p>
-                </div>
-                <button class="btn btn-primary" onclick="switchNav('triage', document.querySelectorAll('.nav-item-btn')[1])">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                  Create New Ticket
-                </button>
-              </div>
-
-              <div class="workflow-steps">
-                <div class="wf-step-card">
-                  <span class="wf-step-num">Step 1</span>
-                  <span class="wf-step-name">Ingest &amp; Clean</span>
-                  <span class="wf-step-desc">Normalizes text &amp; extracts equipment IDs via regex</span>
-                </div>
-                <div class="wf-step-card">
-                  <span class="wf-step-num">Step 2</span>
-                  <span class="wf-step-name">ML Classify</span>
-                  <span class="wf-step-desc">TF-IDF + Logistic Regression suggests category &amp; severity</span>
-                </div>
-                <div class="wf-step-card">
-                  <span class="wf-step-num">Step 3</span>
-                  <span class="wf-step-name">Safety Guard</span>
-                  <span class="wf-step-desc">Escalate-only rules check fire, smoke, and trip hazards</span>
-                </div>
-                <div class="wf-step-card">
-                  <span class="wf-step-num">Step 4</span>
-                  <span class="wf-step-name">Runbook &amp; SLA</span>
-                  <span class="wf-step-desc">Cosine retrieval for actions, weighted priority &amp; routing</span>
-                </div>
-              </div>
-
-              <div style="background-color:#F8FAFC; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:16px; margin-top:16px;">
-                <div style="font-size:12.5px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Operational Note:</div>
-                <p style="font-size:12.5px; color:var(--text-muted); line-height:1.5;">
-                  The system acts as a real-time decision-support layer for control-room analysts. In this prototype, tickets are processed on demand. Results propose ranked causes to check and never autonomously alter physical equipment.
-                </p>
-              </div>
-            </div>
-
-            <!-- Asset Classes Grid -->
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <h3 class="card-title">Supported Asset Categories</h3>
-                  <p class="card-desc">Coverage across Greenko renewable-energy generation portfolio</p>
-                </div>
-              </div>
-              <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;">
-                <div style="padding:14px; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:#FFFFFF;">
-                  <strong style="color:var(--text-main); font-size:13.5px; display:block; margin-bottom:4px;">Solar PV Assets</strong>
-                  <p style="font-size:12px; color:var(--text-muted);">Central inverters, string combiners, tracker rows, ICR rooms, SCADA telemetry.</p>
-                </div>
-                <div style="padding:14px; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:#FFFFFF;">
-                  <strong style="color:var(--text-main); font-size:13.5px; display:block; margin-bottom:4px;">Wind Turbines (WTG)</strong>
-                  <p style="font-size:12px; color:var(--text-muted);">Main gearboxes, CMS bearing vibration, blade pitch systems, nacelles.</p>
-                </div>
-                <div style="padding:14px; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:#FFFFFF;">
-                  <strong style="color:var(--text-main); font-size:13.5px; display:block; margin-bottom:4px;">Hydro Power Assets</strong>
-                  <p style="font-size:12px; color:var(--text-muted);">Spillway gates, penstock intake valves, statutory compliance walkdowns.</p>
-                </div>
-                <div style="padding:14px; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:#FFFFFF;">
-                  <strong style="color:var(--text-main); font-size:13.5px; display:block; margin-bottom:4px;">Substations &amp; Grid</strong>
-                  <p style="font-size:12px; color:var(--text-muted);">Power transformers, Buchholz relays, RTU comms, SLDC curtailment dispatch.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right: Severity Standard & Rehearsed Demo Direct Links -->
-          <div>
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <h3 class="card-title">Severity &amp; SLA Standards</h3>
-                  <p class="card-desc">Target dispatch windows aligned with plant criticality</p>
-                </div>
-              </div>
-              
-              <div style="display:flex; flex-direction:column; gap:10px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#FEF2F2; border:1px solid #FECACA; border-radius:var(--radius-sm);">
-                  <div>
-                    <span class="badge badge-critical">Critical</span>
-                    <span style="font-size:12.5px; color:var(--text-secondary); margin-left:8px;">Active hazard, fire/smoke, major generation trip</span>
-                  </div>
-                  <strong style="font-size:13px; color:#991B1B;">1 Hour SLA</strong>
-                </div>
-
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#FFF7ED; border:1px solid #FED7AA; border-radius:var(--radius-sm);">
-                  <div>
-                    <span class="badge badge-high">High</span>
-                    <span style="font-size:12.5px; color:var(--text-secondary); margin-left:8px;">Severe derating, repeated tripping, impending trip</span>
-                  </div>
-                  <strong style="font-size:13px; color:#C2410C;">4 Hours SLA</strong>
-                </div>
-
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#FEFCE8; border:1px solid #FEF08A; border-radius:var(--radius-sm);">
-                  <div>
-                    <span class="badge badge-medium">Medium</span>
-                    <span style="font-size:12.5px; color:var(--text-secondary); margin-left:8px;">Telemetry gaps, minor misalignment, scheduled PM</span>
-                  </div>
-                  <strong style="font-size:13px; color:#854D0E;">24 Hours SLA</strong>
-                </div>
-
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:var(--radius-sm);">
-                  <div>
-                    <span class="badge badge-low">Low</span>
-                    <span style="font-size:12.5px; color:var(--text-secondary); margin-left:8px;">Routine documentation, minor tag sync, backlog task</span>
-                  </div>
-                  <strong style="font-size:13px; color:#166534;">72 Hours SLA</strong>
-                </div>
-              </div>
-            </div>
-
-            <!-- Ready Demos Card -->
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <h3 class="card-title">Pre-Configured Demo Cases</h3>
-                  <p class="card-desc">Click any ticket to jump directly to AI Triage</p>
-                </div>
-              </div>
-              <div class="demo-cards-grid">
-                <div class="demo-ticket-card" onclick="loadAndRunSample('solar', 'Inverter 4 tripping repeatedly after noon, high temperature alarm visible at Block 2')">
-                  <span class="demo-tag">Solar Asset</span>
-                  <span class="demo-title">Inverter Overheating</span>
-                  <span class="demo-snip">Inverter 4 tripping repeatedly after noon, high temp visible...</span>
-                </div>
-                <div class="demo-ticket-card" onclick="loadAndRunSample('wind', 'WTG-12 gearbox vibration spike with loud grinding noise and metallic debris suspected')">
-                  <span class="demo-tag">Wind Asset</span>
-                  <span class="demo-title">Gearbox Vibration</span>
-                  <span class="demo-snip">WTG-12 vibration spike with grinding noise &amp; debris...</span>
-                </div>
-                <div class="demo-ticket-card" onclick="loadAndRunSample('grid', 'Arc flash sparks observed inside 33kV switchgear bay 1 during switching; area evacuated')">
-                  <span class="demo-tag">Grid Asset</span>
-                  <span class="demo-title">Arc Flash Hazard</span>
-                  <span class="demo-snip">Arc flash sparks seen inside 33kV switchgear bay 1...</span>
-                </div>
-              </div>
-            </div>
-          </div>
+        <label>Load Reference Demo Ticket (6 canonical cases):</label>
+        <div class="demo-list" id="demoButtons">
+          <button class="demo-btn" onclick="loadSample(0)">
+            <span>T001: Inverter Thermal</span>
+            <span class="badge">solar_inverter</span>
+          </button>
+          <button class="demo-btn" onclick="loadSample(1)">
+            <span>T002: Gearbox Vibration</span>
+            <span class="badge">wind_turbine</span>
+          </button>
+          <button class="demo-btn" onclick="loadSample(2)">
+            <span>T003: Statutory Inspection Overdue</span>
+            <span class="badge">wind_turbine</span>
+          </button>
+          <button class="demo-btn" onclick="loadSample(3)">
+            <span>T004: SCADA Telemetry Gap</span>
+            <span class="badge">substation</span>
+          </button>
+          <button class="demo-btn" onclick="loadSample(4)">
+            <span>T005: Hydraulic Pitch Error</span>
+            <span class="badge">wind_turbine</span>
+          </button>
+          <button class="demo-btn" onclick="loadSample(5)">
+            <span>T006: SLDC Curtailment Mismatch</span>
+            <span class="badge">solar_inverter</span>
+          </button>
         </div>
 
-      </section>
-
-      <!-- ================= PAGE 2: AI TICKET TRIAGE ================= -->
-      <section id="page-triage" class="view-page">
-        <div class="grid-2col">
-          
-          <!-- Left: Input Form & Rehearsed Cases -->
-          <div>
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <h3 class="card-title">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                    Ticket Entry
-                  </h3>
-                  <p class="card-desc">Enter field maintenance observations for automated triage</p>
-                </div>
-              </div>
-
-              <!-- Rehearsed Demos Banner -->
-              <div style="margin-bottom:16px;">
-                <label class="form-label" style="font-size:12px; color:var(--text-muted); text-transform:uppercase;">Select Example Case:</label>
-                <div class="demo-cards-grid">
-                  <div class="demo-ticket-card" onclick="fillForm('solar', 'Inverter 4 tripping repeatedly after noon, high temperature alarm visible at Block 2')">
-                    <span class="demo-tag">Solar</span>
-                    <span class="demo-title">Inverter Overheating</span>
-                  </div>
-                  <div class="demo-ticket-card" onclick="fillForm('wind', 'WTG-12 gearbox vibration spike with loud grinding noise and metallic debris suspected')">
-                    <span class="demo-tag">Wind</span>
-                    <span class="demo-title">Gearbox Vibration</span>
-                  </div>
-                  <div class="demo-ticket-card" onclick="fillForm('grid', 'Arc flash sparks observed inside 33kV switchgear bay 1 during switching; area evacuated')">
-                    <span class="demo-tag">Grid</span>
-                    <span class="demo-title">Arc Flash Hazard</span>
-                  </div>
-                </div>
-              </div>
-
-              <form id="triageForm" onsubmit="handleTriageSubmit(event)">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-                  <div class="form-group">
-                    <label class="form-label" for="ticketAsset">Asset Type</label>
-                    <select id="ticketAsset" class="form-select">
-                      <option value="solar">Solar Power</option>
-                      <option value="wind">Wind Turbines</option>
-                      <option value="hydro">Hydro Electric</option>
-                      <option value="grid">Substation &amp; Grid</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="ticketId">Ticket ID <span style="font-weight:400; color:var(--text-light);">(Optional)</span></label>
-                    <input type="text" id="ticketId" class="form-input" placeholder="e.g. TKT-9021" value="ADHOC-01">
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label" for="ticketText">Ticket Description</label>
-                  <textarea id="ticketText" class="form-textarea" placeholder="Example: Inverter 4 is repeatedly tripping after noon and a high-temperature alarm is visible on SCADA." required></textarea>
-                  <p class="form-hint">Minimum 5 characters. Include asset IDs, symptoms, and alarm indications.</p>
-                </div>
-
-                <div style="display:flex; gap:10px; align-items:center; margin-top:20px;">
-                  <button type="submit" id="submitBtn" class="btn btn-primary" style="flex:1;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                    Run AI Triage
-                  </button>
-                  <button type="button" class="btn btn-secondary" onclick="clearTriageForm()">
-                    Clear
-                  </button>
-                </div>
-
-                <div id="formErrorBanner" class="result-alert alert-escalation" style="display:none; margin-top:14px;">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                  <span id="formErrorMsg">Validation error message</span>
-                </div>
-              </form>
-            </div>
-
-            <!-- "Why This Prediction" Explanatory Highlights Card -->
-            <div class="card" id="explainCard" style="display:none;">
-              <div class="card-header">
-                <div>
-                  <h3 class="card-title">Why Did the AI Make This Decision?</h3>
-                  <p class="card-desc">Token feature weights contributing to category classification</p>
-                </div>
-              </div>
-              <div class="highlight-card" id="textWithHighlights"></div>
-              <div id="topTermsChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;"></div>
-            </div>
+        <form id="triageForm" onsubmit="handleTriage(event)">
+          <div class="form-group">
+            <label for="assetType">Asset Type</label>
+            <select id="assetType">
+              <option value="wind_turbine">Wind Turbine</option>
+              <option value="solar_inverter">Solar Inverter</option>
+              <option value="substation">Substation / Grid</option>
+              <option value="hydro_turbine">Hydro Turbine</option>
+            </select>
           </div>
 
-          <!-- Right: Triage Results & Trace -->
-          <div>
-            <!-- Empty State when no ticket evaluated -->
-            <div class="card" id="triageEmptyState">
-              <div class="empty-state">
-                <div class="empty-state-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                </div>
-                <h3>No Ticket Evaluated Yet</h3>
-                <p>Select one of the demo tickets on the left or write a custom description and click <strong>Run AI Triage</strong> to see the complete decision output.</p>
-              </div>
-            </div>
-
-            <!-- Populated Results Card -->
-            <div id="triageResultContainer" style="display:none;">
-
-              <!-- Action Bar: Download PDF Report & Print Report -->
-              <div class="report-action-bar" id="reportActionBar">
-                <div style="display:flex; align-items:center; gap:10px;">
-                  <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; background:var(--primary-subtle); color:var(--primary); flex-shrink:0;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                  </span>
-                  <div>
-                    <strong style="font-size:13.5px; color:var(--text-main); display:block; line-height:1.2;">Official Assessment Report</strong>
-                    <span style="font-size:11.5px; color:var(--text-muted);">5-Page Industrial Audit Document with full 9-step agent trace</span>
-                  </div>
-                </div>
-
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <button type="button" id="downloadPdfBtn" class="btn btn-primary" onclick="downloadCurrentTriagePdf()">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    <span id="downloadPdfBtnText">Download PDF Report</span>
-                  </button>
-                  <button type="button" id="printReportBtn" class="btn btn-secondary" onclick="printCurrentReport()">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                    <span id="printReportBtnText">Print Report</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- PDF Download Status Banner -->
-              <div id="pdfFeedbackBanner" class="result-alert" style="display:none; margin-bottom:14px;">
-                <span id="pdfFeedbackIcon" style="display:inline-flex; align-items:center;"></span>
-                <span id="pdfFeedbackMsg"></span>
-              </div>
-              
-              <!-- Conditional Banners: Guardrail Escalation & Human Review -->
-              <div id="guardrailAlertBanner" class="result-alert alert-escalation" style="display:none;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                <div>
-                  <strong>Safety Guardrail Activated:</strong> Severity was escalated to <span id="alertEscTo">Critical</span> due to detected high-consequence hazard indicators.
-                </div>
-              </div>
-
-              <div id="humanReviewAlertBanner" class="result-alert alert-warning" style="display:none;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                <div>
-                  <strong>Human Review Recommended:</strong> The model is uncertain about this prediction. An operations analyst should verify the assignment.
-                  <div id="humanReviewReasons" style="font-size:12px; margin-top:4px;"></div>
-                </div>
-              </div>
-
-              <!-- Main Decision Card -->
-              <div class="card">
-                <div class="decision-top">
-                  <div>
-                    <span style="font-size:12px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Classification Decision</span>
-                    <h3 id="resCategoryName" style="font-size:20px; font-weight:700; color:var(--text-main); margin-top:2px;">Inverter Thermal</h3>
-                  </div>
-                  <div id="resSeverityBadgeWrap">
-                    <span class="badge badge-high" id="resSeverityBadge">High</span>
-                  </div>
-                </div>
-
-                <!-- Priority Progress Bar -->
-                <div class="priority-meter-wrap">
-                  <div class="priority-bar-label">
-                    <span>Priority Score</span>
-                    <span id="priorityScoreVal">77.8 / 100</span>
-                  </div>
-                  <div class="priority-track">
-                    <div class="priority-fill" id="priorityFillBar" style="width:78%; background-color:var(--primary);"></div>
-                  </div>
-                </div>
-
-                <!-- Meta Grid -->
-                <div class="decision-grid-meta">
-                  <div class="meta-box">
-                    <div class="m-lbl">Assigned Team</div>
-                    <div class="m-val" id="resTeamVal" style="font-size:13px;">Solar Electrical</div>
-                  </div>
-                  <div class="meta-box">
-                    <div class="m-lbl">Target SLA</div>
-                    <div class="m-val" id="resSlaVal">4 Hours</div>
-                  </div>
-                  <div class="meta-box">
-                    <div class="m-lbl">Escalation Tier</div>
-                    <div class="m-val" id="resTierVal" style="font-size:13px;">Tier-2 Dispatch</div>
-                  </div>
-                  <div class="meta-box">
-                    <div class="m-lbl">Confidence (Cat / Sev)</div>
-                    <div class="m-val" id="resConfidenceVal">88% / 91%</div>
-                  </div>
-                </div>
-
-                <div style="margin-top:16px; padding:12px 14px; background-color:#F8FAFC; border-radius:var(--radius-sm); border:1px solid var(--border-color); font-size:13px; color:var(--text-secondary); line-height:1.5;">
-                  <strong>Summary:</strong> <span id="resExplanationText">Classified as inverter_thermal...</span>
-                </div>
-              </div>
-
-              <!-- Runbook Recommendations Card -->
-              <div class="card">
-                <div class="card-header">
-                  <div>
-                    <h3 class="card-title">Runbook Evidence &amp; Recommended Actions</h3>
-                    <p class="card-desc">Retrieved from local O&amp;M knowledge repository via TF-IDF cosine similarity</p>
-                  </div>
-                  <span class="badge badge-info" id="runbookIdBadge">RB-INV-01</span>
-                </div>
-
-                <div>
-                  <strong style="font-size:13px; color:var(--text-main); display:block; margin-bottom:4px;">Probable Causes to Check (Not confirmed diagnoses):</strong>
-                  <ul class="action-list" id="resProbableCausesList"></ul>
-                </div>
-
-                <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);">
-                  <strong style="font-size:13px; color:var(--text-main); display:block; margin-bottom:4px;">Recommended Next Troubleshooting Steps:</strong>
-                  <ul class="action-list" id="resNextActionsList"></ul>
-                </div>
-              </div>
-
-              <!-- Expandable Agent Trace -->
-              <details class="agent-trace-accordion">
-                <summary>
-                  <span>How the AI processed this ticket (9 Agent Steps)</span>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                </summary>
-                <div class="trace-body-container" id="agentTraceList"></div>
-              </details>
-
-            </div>
+          <div class="form-group">
+            <label for="ticketText">Problem Description</label>
+            <textarea id="ticketText" required placeholder="Describe observed fault, alarm code, or inspection findings (e.g. Inverter inverter-04 high internal temperature...)"></textarea>
           </div>
 
+          <button type="submit" class="btn-submit" id="submitBtn">
+            <span>Analyze &amp; Prioritize Ticket</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Result Panel -->
+      <div class="card">
+        <div class="card-title">
+          <span>AI Triage Assessment</span>
         </div>
-      </section>
 
-      <!-- ================= PAGE 3: TICKET HISTORY ================= -->
-      <section id="page-history" class="view-page">
-        <div class="card">
-          <div class="card-header">
+        <div id="placeholder" class="placeholder-result">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p>Select a reference ticket above or enter a problem description, then click "Analyze &amp; Prioritize Ticket".</p>
+        </div>
+
+        <div id="resultContent" class="result-section">
+          <div id="safetyBanner" class="alert-box" style="display:none;">
+            <strong>⚠️ Safety Escalation Triggered:</strong>
+            <span id="safetyReason">Active hazard detected</span>
+          </div>
+
+          <div class="result-header">
             <div>
-              <h3 class="card-title">Recent In-Memory Triage History</h3>
-              <p class="card-desc">Session ticket buffer used for in-memory duplicate detection</p>
+              <div class="result-label">Predicted Category</div>
+              <span id="resCategory" class="code-val">-</span>
             </div>
-            <span class="badge badge-warning">Ephemeral Session Buffer</span>
-          </div>
-
-          <div style="background-color:#FFFBEB; border:1px solid #FCD34D; border-radius:var(--radius-sm); padding:14px; margin-bottom:18px; font-size:13px; color:#92400E;">
-            <strong>Database Persistence Notice:</strong> Real persistent database storage (PostgreSQL / CMMS integration) is planned for production. The prototype currently records tickets evaluated in this active server session for token Jaccard similarity repeat-fault checking.
-          </div>
-
-          <div class="table-responsive">
-            <table class="data-table" id="historyTable">
-              <thead>
-                <tr>
-                  <th>Ticket ID</th>
-                  <th>Asset Type</th>
-                  <th>Category</th>
-                  <th>Severity</th>
-                  <th>Priority</th>
-                  <th>Assigned Team</th>
-                  <th>Human Review</th>
-                  <th>PDF Report</th>
-                </tr>
-              </thead>
-              <tbody id="historyTableBody">
-                <tr>
-                  <td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">No tickets evaluated in this session yet. Run a triage from the AI Ticket Triage tab.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- ================= PAGE 4: ANALYTICS & MODEL PERFORMANCE ================= -->
-      <section id="page-analytics" class="view-page">
-        
-        <!-- SECTION A: Overview KPIs -->
-        <div class="kpi-row" id="analyticsKpiRow">
-          <div class="kpi-card">
-            <div class="k-label">Deduplicated Training Data</div>
-            <div class="k-value" id="kpiTotalDedup">426</div>
-            <div class="k-sub">6 bundled + 420 synthetic (seed=42)</div>
-          </div>
-          <div class="kpi-card">
-            <div class="k-label">5-Fold CV Category Macro-F1</div>
-            <div class="k-value" id="kpiCvCatF1">1.0000</div>
-            <div class="k-sub">Synthetic template data separability</div>
-          </div>
-          <div class="kpi-card">
-            <div class="k-label">5-Fold Critical Recall</div>
-            <div class="k-value" id="kpiCvCritRecall">0.9399 &plusmn; 0.06</div>
-            <div class="k-sub">Portion of true critical hazards caught</div>
-          </div>
-          <div class="kpi-card">
-            <div class="k-label">5-Fold Under-Triage Rate</div>
-            <div class="k-value" id="kpiCvUnderTriage">0.0352 &plusmn; 0.03</div>
-            <div class="k-sub">Fraction predicted &lt; actual urgency</div>
-          </div>
-        </div>
-
-        <!-- SECTION B: Model Comparison -->
-        <div class="card">
-          <div class="card-header">
             <div>
-              <h3 class="card-title">Model Benchmarks: Test Set &amp; Hand-Written Challenge Set</h3>
-              <p class="card-desc">Comparing Keyword Baseline, Logistic Regression, LinearSVC, and Multinomial Naive Bayes</p>
+              <div class="result-label" style="text-align: right;">Assessed Severity</div>
+              <span id="resSeverityBadge" class="sev-badge sev-medium">MEDIUM</span>
             </div>
-            <span class="badge badge-info">Honest Generalisation</span>
           </div>
 
-          <div style="background-color:#F8FAFC; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:14px; font-size:12.5px; color:var(--text-secondary);">
-            <strong>Interpretation Guide:</strong> The <strong>Test Set</strong> (86 rows) is drawn from synthetic templates, explaining the perfect 1.0 F1. The <strong>Challenge Set</strong> (30 rows) consists of hand-written, paraphrased, negated tickets never seen during training—this is the honest generalisation metric. Notice that <strong>Logistic Regression</strong> achieves the lowest challenge under-triage rate (13.33%).
+          <div class="result-row">
+            <div class="result-label">Cosine Similarity Confidence</div>
+            <div id="resConfidence" class="result-val">-</div>
           </div>
 
-          <div class="table-responsive">
-            <table class="data-table" id="modelComparisonTable">
-              <thead>
-                <tr>
-                  <th>Model Pipeline</th>
-                  <th>Test Cat Macro-F1</th>
-                  <th>Test Crit Recall</th>
-                  <th>Test Under-Triage</th>
-                  <th>Challenge Cat F1</th>
-                  <th>Challenge Crit Recall</th>
-                  <th>Challenge Under-Triage</th>
-                </tr>
-              </thead>
-              <tbody id="modelComparisonBody"></tbody>
-            </table>
+          <div class="result-row">
+            <div class="result-label">Responsible Maintenance Team</div>
+            <div id="resTeam" class="result-val" style="font-weight: 600;">-</div>
+          </div>
+
+          <div class="result-row">
+            <div class="result-label">Probable Root Cause</div>
+            <div id="resCause" class="result-val">-</div>
+          </div>
+
+          <div class="result-row">
+            <div class="result-label">Recommended Next Action</div>
+            <div id="resAction" class="result-val">-</div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- SECTION C & D in 2 columns: Confusion Matrix Heatmap & Feature Ablation -->
-        <div class="grid-2col">
-          <!-- Confusion Matrix Heatmap -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <h3 class="card-title">Severity Confusion Matrix (Heatmap)</h3>
-                <p class="card-desc">Held-out test split (86 rows, rows=Actual, cols=Predicted)</p>
-              </div>
-            </div>
-            <div class="table-responsive">
-              <table class="data-table" id="confusionHeatmapTable">
-                <thead>
-                  <tr>
-                    <th>Actual \ Predicted</th>
-                    <th>Low</th>
-                    <th>Medium</th>
-                    <th>High</th>
-                    <th>Critical</th>
-                  </tr>
-                </thead>
-                <tbody id="confusionHeatmapBody"></tbody>
-              </table>
-            </div>
-            <p style="font-size:12px; color:var(--text-muted); margin-top:10px;">
-              Green cells on the diagonal represent correct classifications. Red cells represent triage errors.
-            </p>
-          </div>
-
-          <!-- Feature Ablation -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <h3 class="card-title">Advanced Feature Ablation</h3>
-                <p class="card-desc">Impact of removing asset_type or character n-grams</p>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table class="data-table" id="ablationTable">
-                <thead>
-                  <tr>
-                    <th>Variant</th>
-                    <th>Test Cat F1</th>
-                    <th>Test Sev F1</th>
-                    <th>Challenge Cat F1</th>
-                    <th>Challenge Sev F1</th>
-                  </tr>
-                </thead>
-                <tbody id="ablationTableBody"></tbody>
-              </table>
-            </div>
-            <p style="font-size:12px; color:var(--text-muted); margin-top:10px;">
-              Removing character n-grams drops challenge category F1 from 0.87 to 0.79 because typographical errors (e.g. <em>invertr</em>, <em>vibraton</em>) fail to match.
-            </p>
-          </div>
-        </div>
-
-      </section>
-
-      <!-- ================= PAGE 5: RUNBOOK & RECOMMENDATIONS ================= -->
-      <section id="page-runbook" class="view-page">
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <h3 class="card-title">What is an O&amp;M Runbook?</h3>
-              <p class="card-desc">Local domain knowledge base mapping equipment faults to safe operational procedures</p>
-            </div>
-            <span class="badge badge-info">data/runbook.json</span>
-          </div>
-
-          <p style="font-size:13.5px; color:var(--text-secondary); line-height:1.5;">
-            An O&amp;M Runbook provides standardized standard operating procedures (SOPs) for field technicians and control-room operators. When a ticket is classified, the triage agent queries the runbook using <strong>TF-IDF cosine similarity</strong> across fault keywords to attach relevant inspection steps and probable causes.
-          </p>
-
-          <div style="background-color:#F0FDF4; border:1px solid #BBF7D0; border-radius:var(--radius-sm); padding:12px 16px; margin:16px 0; font-size:12.5px; color:#166534;">
-            <strong>Important Safety Distinction:</strong> Retrieved probable causes are strictly <em>candidates to check</em>, never confirmed diagnoses. Technicians must perform physical lock-out / tag-out (LOTO) and instrument verification before maintenance.
-          </div>
-
-          <div class="table-responsive" style="margin-top:16px;">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Fault Category</th>
-                  <th>Responsible Team</th>
-                  <th>Asset Criticality</th>
-                  <th>Loss Risk</th>
-                  <th>Runbook ID</th>
-                  <th>Key Inspection Focus</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>inverter_thermal</code></td>
-                  <td>Solar O&amp;M Electrical Team</td>
-                  <td>0.85</td>
-                  <td>0.85</td>
-                  <td>RB-INV-01</td>
-                  <td>Check IGBT heatsink temp, blower fans, clean intake filter</td>
-                </tr>
-                <tr>
-                  <td><code>gearbox_vibration</code></td>
-                  <td>Wind Mechanical &amp; CMS Team</td>
-                  <td>0.95</td>
-                  <td>0.90</td>
-                  <td>RB-GBX-01</td>
-                  <td>CMS vibration spectrum, oil sample ferrography, chip detector</td>
-                </tr>
-                <tr>
-                  <td><code>pitch_system</code></td>
-                  <td>Wind Controls &amp; Hydraulics</td>
-                  <td>0.90</td>
-                  <td>0.85</td>
-                  <td>RB-PCH-01</td>
-                  <td>Blade pitch angle mismatch, emergency battery bank voltage</td>
-                </tr>
-                <tr>
-                  <td><code>safety_incident</code></td>
-                  <td>EHS &amp; Emergency Response Team</td>
-                  <td>1.00</td>
-                  <td>0.80</td>
-                  <td>RB-SAF-01</td>
-                  <td>Immediate cordon, LOTO isolation, personnel check, clearance</td>
-                </tr>
-                <tr>
-                  <td><code>transformer_fault</code></td>
-                  <td>Substation &amp; HV Maintenance</td>
-                  <td>0.95</td>
-                  <td>0.90</td>
-                  <td>RB-TXF-01</td>
-                  <td>Buchholz gas accumulation, oil level gauge, DGA sample</td>
-                </tr>
-                <tr>
-                  <td><code>grid_curtailment</code></td>
-                  <td>Grid &amp; PPC Dispatch Desk</td>
-                  <td>0.80</td>
-                  <td>0.75</td>
-                  <td>RB-GRD-01</td>
-                  <td>PPC setpoint handshaking with SLDC RTU, feeder MW check</td>
-                </tr>
-                <tr>
-                  <td><code>data_gap</code></td>
-                  <td>SCADA &amp; Telemetry Engineering</td>
-                  <td>0.60</td>
-                  <td>0.45</td>
-                  <td>RB-DAT-01</td>
-                  <td>Inverter HMI local check, RTU/switch polling service restart</td>
-                </tr>
-                <tr>
-                  <td><code>inspection_compliance</code></td>
-                  <td>EHS &amp; Compliance Audit Team</td>
-                  <td>0.55</td>
-                  <td>0.30</td>
-                  <td>RB-CMP-01</td>
-                  <td>Upload statutory PM register, spillway gate walkdown check</td>
-                </tr>
-                <tr>
-                  <td><code>communication_loss</code></td>
-                  <td>OT Network &amp; SCADA Comms Team</td>
-                  <td>0.75</td>
-                  <td>0.55</td>
-                  <td>RB-COM-01</td>
-                  <td>Fiber ring break isolation, ping RTU, local protection arming</td>
-                </tr>
-                <tr>
-                  <td><code>tracker_fault</code></td>
-                  <td>Solar Mechanical &amp; Tracker Team</td>
-                  <td>0.50</td>
-                  <td>0.50</td>
-                  <td>RB-TRK-01</td>
-                  <td>NCU controller battery, manual stow before storm alert</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- ================= PAGE 6: SYSTEM INFORMATION ================= -->
-      <section id="page-system" class="view-page">
-        
-        <!-- SECTION A: Architecture Workflow -->
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <h3 class="card-title">Complete 9-Step Agent Workflow</h3>
-              <p class="card-desc">Deterministic execution trace logged on every triage request</p>
-            </div>
-          </div>
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Step</th>
-                  <th>Tool Name</th>
-                  <th>Operational Role</th>
-                  <th>Deterministic Logic / Model Applied</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>1</td>
-                  <td><code>normalize_and_extract</code></td>
-                  <td>Text Sanitization &amp; Entity Tagging</td>
-                  <td>Regex extraction for equipment (WTG-12, Inverter 4) &amp; sites (Block 2)</td>
-                </tr>
-                <tr>
-                  <td>2</td>
-                  <td><code>classify_ticket</code></td>
-                  <td>Category &amp; Severity Proposal</td>
-                  <td>TF-IDF (word+char) + Logistic Regression with class-weight balanced</td>
-                </tr>
-                <tr>
-                  <td>3</td>
-                  <td><code>safety_guardrail</code></td>
-                  <td>Hazard Escalation Override</td>
-                  <td>Deterministic escalate-only keyword rules with negation check window</td>
-                </tr>
-                <tr>
-                  <td>4</td>
-                  <td><code>lookup_runbook</code></td>
-                  <td>Knowledge Base Retrieval</td>
-                  <td>TF-IDF cosine similarity search across local <code>data/runbook.json</code></td>
-                </tr>
-                <tr>
-                  <td>5</td>
-                  <td><code>check_duplicates</code></td>
-                  <td>Repeat Fault Detection</td>
-                  <td>Token Jaccard similarity (&gt;= 0.65) against last 50 in-memory session tickets</td>
-                </tr>
-                <tr>
-                  <td>6</td>
-                  <td><code>compute_priority</code></td>
-                  <td>Transparent Urgency Scoring</td>
-                  <td>Deterministic weighted formula calculating exact 0–100 integer score</td>
-                </tr>
-                <tr>
-                  <td>7</td>
-                  <td><code>route_ticket</code></td>
-                  <td>Dispatch Assignment</td>
-                  <td>Maps category to O&amp;M team and severity to SLA (1h, 4h, 24h, 72h)</td>
-                </tr>
-                <tr>
-                  <td>8</td>
-                  <td><code>confidence_gate</code></td>
-                  <td>Human-in-the-Loop Safeguard</td>
-                  <td>Flags <code>needs_human_review</code> if confidence &lt; 0.45 or margin &lt; 0.12</td>
-                </tr>
-                <tr>
-                  <td>9</td>
-                  <td><code>explanation_layer</code></td>
-                  <td>Analyst Summary Output</td>
-                  <td>Deterministic template by default; optional LLM without schema drift</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- SECTION B: Priority Formula -->
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <h3 class="card-title">Priority Scoring Formula</h3>
-              <p class="card-desc">Fully transparent mathematical weighting without hidden heuristics</p>
-            </div>
-            <span class="badge badge-info">backend/priority.py</span>
-          </div>
-
-          <div class="formula-box">
-priority_score = 100 * (
-    0.45 * severity_weight
-  + 0.20 * asset_criticality
-  + 0.20 * generation_loss_risk
-  + 0.10 * safety_flag
-  + 0.05 * min(duplicate_count, 3) / 3
-)
-          </div>
-
-          <div class="weights-grid">
-            <div class="weight-card">
-              <div class="w-pct">45%</div>
-              <div class="w-name">Severity Weight</div>
-              <div class="w-desc">Low=0.25, Med=0.50, High=0.75, Critical=1.00</div>
-            </div>
-            <div class="weight-card">
-              <div class="w-pct">20%</div>
-              <div class="w-name">Asset Criticality</div>
-              <div class="w-desc">Turbines (0.95), Substation TX (0.95), Trackers (0.50)</div>
-            </div>
-            <div class="weight-card">
-              <div class="w-pct">20%</div>
-              <div class="w-name">Generation Loss Risk</div>
-              <div class="w-desc">Direct MWh curtailment / downtime exposure</div>
-            </div>
-            <div class="weight-card">
-              <div class="w-pct">10%</div>
-              <div class="w-name">Safety Flag</div>
-              <div class="w-desc">1.0 if fire, smoke, arc flash or trip detected; else 0</div>
-            </div>
-            <div class="weight-card">
-              <div class="w-pct">5%</div>
-              <div class="w-name">Repeat Fault Count</div>
-              <div class="w-desc">Capped at 3 duplicates (0.33, 0.66, 1.0)</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- SECTION C & D in 2 columns: Tech Stack & Limitations -->
-        <div class="grid-2col">
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <h3 class="card-title">Technology Stack</h3>
-                <p class="card-desc">Fast, production-viable lightweight architecture</p>
-              </div>
-            </div>
-            <ul class="action-list">
-              <li><strong>Python 3.12:</strong> Modern standard runtime</li>
-              <li><strong>FastAPI &amp; Uvicorn:</strong> Async REST API with Pydantic validation</li>
-              <li><strong>scikit-learn 1.5:</strong> TF-IDF word/char vectorizers and Logistic Regression</li>
-              <li><strong>Pandas &amp; NumPy:</strong> Dataset transformations and confusion matrix computation</li>
-              <li><strong>Joblib 1.6:</strong> High-performance model serialization (~980 KB)</li>
-              <li><strong>Vanilla HTML5/CSS3/JS:</strong> Zero-dependency enterprise UI; instant loading</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <h3 class="card-title">Current Prototype Limitations</h3>
-                <p class="card-desc">Honest assessment of roadmap engineering gaps</p>
-              </div>
-            </div>
-            <ul class="action-list">
-              <li><strong>Synthetic Dataset:</strong> 420 synthetic tickets created due to 6-row bundled starter data</li>
-              <li><strong>Single-Label Classification:</strong> Compound multi-fault tickets get one primary category</li>
-              <li><strong>English Language:</strong> Plant tickets in regional vernacular require multilingual embeddings</li>
-              <li><strong>In-Memory Buffer:</strong> Duplicates checked in session memory; requires CMMS SQL persistence</li>
-              <li><strong>No Drift Monitoring:</strong> Requires automated retraining loop on production analyst feedback</li>
-            </ul>
-          </div>
-        </div>
-
-      </section>
-
-    </main>
+    <footer>
+      Greenko Group O&amp;M Maintenance Ticket Prioritization Engine &bull; Modular TF-IDF + KNN Architecture
+    </footer>
   </div>
 
   <script>
-    // Configuration: Unified same-origin relative API path for Vercel & local
-    const API_BASE = '';
+    let demoTickets = [];
 
-    let currentNav = 'dashboard';
-    let metricsCache = null;
-    let recentSessionTickets = [];
-    let currentTriageResult = null;
+    // Preloaded fallbacks matching canonical dataset
+    const localDemos = [
+      { ticket_id: "T001", asset_type: "solar_inverter", description: "Inverter inverter-04 reported high internal temperature exceeding threshold during peak irradiance. Cooling fan circuit breaker tripped." },
+      { ticket_id: "T002", asset_type: "wind_turbine", description: "Turbine WTG-12 CMS alert: High-speed shaft bearing vibration velocity exceeded 7.2 mm/s RMS. Radial play detected." },
+      { ticket_id: "T003", asset_type: "wind_turbine", description: "Statutory annual ladder and fall-arrest system safety inspection overdue on WTG-07 by 14 days. Regulatory audit pending." },
+      { ticket_id: "T004", asset_type: "substation", description: "Substation RTU communication gateway offline. No telemetry received for Feeder-02 meters since 04:00 AM." },
+      { ticket_id: "T005", asset_type: "wind_turbine", description: "WTG-03 hydraulic pitch system error: Blade A pitch angle deviation 4.2 degrees from commanded setpoint. Pitch pump cycling frequently." },
+      { ticket_id: "T006", asset_type: "solar_inverter", description: "Solar Farm Block-B curtailment order from SLDC not acknowledged by Power Plant Controller. Active power export exceeding 45 MW cap." }
+    ];
 
-    // Navigation Switcher
-    function switchNav(navId, btnElement) {
-      currentNav = navId;
-      document.querySelectorAll('.view-page').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.nav-item-btn').forEach(el => el.classList.remove('active'));
-
-      const targetPage = document.getElementById('page-' + navId);
-      if (targetPage) targetPage.classList.add('active');
-      if (btnElement) btnElement.classList.add('active');
-
-      // Update Topbar Titles
-      const headingEl = document.getElementById('pageHeading');
-      const subEl = document.getElementById('pageSubheading');
-      if (navId === 'dashboard') {
-        headingEl.textContent = 'Maintenance Operations Overview';
-        subEl.textContent = 'Monitor, classify and prioritize maintenance issues across renewable-energy assets.';
-      } else if (navId === 'triage') {
-        headingEl.textContent = 'AI Maintenance Ticket Triage';
-        subEl.textContent = 'Enter a maintenance issue to identify its fault category, urgency, priority and recommended response.';
-      } else if (navId === 'history') {
-        headingEl.textContent = 'Session Ticket History';
-        subEl.textContent = 'Inspect tickets evaluated during this active control-room session.';
-      } else if (navId === 'analytics') {
-        headingEl.textContent = 'Analytics & Model Performance';
-        subEl.textContent = 'Review cross-validation metrics, model comparison benchmarks, and feature ablation.';
-        loadAnalyticsData();
-      } else if (navId === 'runbook') {
-        headingEl.textContent = 'Runbook & Recommendations';
-        subEl.textContent = 'Explore domain SOPs and standard operating procedures for renewable assets.';
-      } else if (navId === 'system') {
-        headingEl.textContent = 'System Architecture & Priority Logic';
-        subEl.textContent = 'Inspect technical pipelines, transparent priority weights, and prototype limitations.';
-      }
-
-      // Close mobile sidebar if open
-      document.getElementById('appSidebar').classList.remove('open');
-    }
-
-    function toggleSidebar() {
-      document.getElementById('appSidebar').classList.toggle('open');
-    }
-
-    // Backend Health Ping
-    async function checkBackendHealth() {
-      const pill = document.getElementById('backendPill');
-      const pillText = document.getElementById('backendPillText');
-      const dot = document.getElementById('backendDot');
-      const sideText = document.getElementById('sidebarStatusText');
-      const dashState = document.getElementById('dashEngineState');
-
+    async function initDemo() {
       try {
-        const res = await fetch(API_BASE + '/api/health');
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        
-        if (data.status === 'ok') {
-          pill.className = 'status-pill ready';
-          pillText.textContent = 'Backend: Ready';
-          dot.style.backgroundColor = '#10B981';
-          sideText.textContent = 'Online';
-          sideText.style.color = '#059669';
-          if (dashState) dashState.textContent = 'Operational';
-        } else {
-          pill.className = 'status-pill waking';
-          pillText.textContent = 'Backend: Degraded';
-          dot.style.backgroundColor = '#EAB308';
-          sideText.textContent = 'Degraded';
+        const res = await fetch('/api/demo');
+        if (res.ok) {
+          demoTickets = await res.json();
         }
-      } catch (err) {
-        pill.className = 'status-pill waking';
-        pillText.textContent = 'Backend: Waking / Offline';
-        dot.style.backgroundColor = '#EAB308';
-        sideText.textContent = 'Waking Up';
-        if (dashState) dashState.textContent = 'Waking Up';
+      } catch (e) {
+        demoTickets = localDemos;
       }
+      if (!demoTickets.length) demoTickets = localDemos;
     }
 
-    // Triage Form Handling
-    function fillForm(asset, text) {
-      document.getElementById('ticketAsset').value = asset;
-      document.getElementById('ticketText').value = text;
-      document.getElementById('ticketText').focus();
+    function loadSample(idx) {
+      const ticket = (demoTickets && demoTickets[idx]) ? demoTickets[idx] : localDemos[idx];
+      document.getElementById('ticketText').value = ticket.description;
+      document.getElementById('assetType').value = ticket.asset_type;
     }
 
-    function loadAndRunSample(asset, text) {
-      switchNav('triage', document.querySelectorAll('.nav-item-btn')[1]);
-      fillForm(asset, text);
-      executeTriage(asset, text, 'DEMO-' + Date.now().toString().slice(-4));
-    }
-
-    function clearTriageForm() {
-      document.getElementById('ticketText').value = '';
-      document.getElementById('formErrorBanner').style.display = 'none';
-      document.getElementById('triageResultContainer').style.display = 'none';
-      document.getElementById('triageEmptyState').style.display = 'block';
-      document.getElementById('explainCard').style.display = 'none';
-    }
-
-    function handleTriageSubmit(e) {
-      e.preventDefault();
-      const asset = document.getElementById('ticketAsset').value;
+    async function handleTriage(event) {
+      event.preventDefault();
       const text = document.getElementById('ticketText').value.trim();
-      const tid = document.getElementById('ticketId').value.trim() || 'ADHOC';
+      const assetType = document.getElementById('assetType').value;
+      const submitBtn = document.getElementById('submitBtn');
 
-      const errBanner = document.getElementById('formErrorBanner');
-      const errMsg = document.getElementById('formErrorMsg');
-      errBanner.style.display = 'none';
+      if (!text) return;
 
-      if (text.length < 5) {
-        errMsg.textContent = 'Please enter at least 5 characters describing the maintenance issue.';
-        errBanner.style.display = 'flex';
-        return;
-      }
-
-      executeTriage(asset, text, tid);
-    }
-
-    async function executeTriage(asset, text, ticketId) {
-      const btn = document.getElementById('submitBtn');
-      const errBanner = document.getElementById('formErrorBanner');
-      const errMsg = document.getElementById('formErrorMsg');
-      errBanner.style.display = 'none';
-
-      btn.disabled = true;
-      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg> Processing Triage...`;
+      submitBtn.disabled = true;
+      submitBtn.innerText = "Analyzing...";
 
       try {
-        const res = await fetch(API_BASE + '/api/triage', {
+        const response = await fetch('/api/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ asset_type: asset, description: text, ticket_id: ticketId })
+          body: JSON.stringify({ text: text, asset_type: assetType })
         });
 
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.detail || JSON.stringify(data));
+        if (!response.ok) {
+          const err = await response.json();
+          alert("Error: " + (err.detail || "Failed to process ticket."));
+          return;
         }
 
-        renderTriageResults(text, data);
-        recordInSessionHistory(data);
+        const data = await response.json();
+        renderResult(data);
       } catch (err) {
-        errMsg.textContent = 'API Error: ' + err.message;
-        errBanner.style.display = 'flex';
+        alert("Network error: Could not reach triage API.");
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run AI Triage`;
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Analyze & Prioritize Ticket";
       }
     }
 
-    function escapeHtml(str) {
-      return String(str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    }
+    function renderResult(data) {
+      document.getElementById('placeholder').style.display = 'none';
+      document.getElementById('resultContent').style.display = 'block';
 
-    function renderTriageResults(rawText, d) {
-      currentTriageResult = { ...d, raw_description: rawText };
+      document.getElementById('resCategory').innerText = data.category || 'unknown';
+      document.getElementById('resConfidence').innerText = (data.confidence * 100).toFixed(1) + '% similarity';
+      document.getElementById('resTeam').innerText = data.assigned_team || 'General Operations';
+      document.getElementById('resCause').innerText = data.probable_cause || '-';
+      document.getElementById('resAction').innerText = data.recommended_action || '-';
 
-      document.getElementById('triageEmptyState').style.display = 'none';
-      document.getElementById('triageResultContainer').style.display = 'block';
-      document.getElementById('explainCard').style.display = 'block';
+      const sev = (data.severity || 'medium').toLowerCase();
+      const badge = document.getElementById('resSeverityBadge');
+      badge.innerText = sev.toUpperCase();
+      badge.className = 'sev-badge sev-' + sev;
 
-      // Reset PDF feedback
-      const pdfBanner = document.getElementById('pdfFeedbackBanner');
-      if (pdfBanner) pdfBanner.style.display = 'none';
-
-      // 1. Category and Severity Badge
-      document.getElementById('resCategoryName').textContent = (d.category || '').replace(/_/g, ' ').toUpperCase();
-      
-      const sevBadge = document.getElementById('resSeverityBadge');
-      const sev = (d.severity || 'medium').toLowerCase();
-      sevBadge.textContent = sev;
-      sevBadge.className = 'badge badge-' + (sev === 'critical' ? 'critical' : sev === 'high' ? 'high' : sev === 'low' ? 'low' : 'medium');
-
-      // 2. Guardrail Escalation & Review Banners
-      const guardBanner = document.getElementById('guardrailAlertBanner');
-      if (d.guardrail_escalated) {
-        guardBanner.style.display = 'flex';
-        document.getElementById('alertEscTo').textContent = d.severity.toUpperCase();
+      const safetyBanner = document.getElementById('safetyBanner');
+      if (data.escalated) {
+        safetyBanner.style.display = 'flex';
+        document.getElementById('safetyReason').innerText = data.safety_trigger || 'Critical safety hazard condition detected.';
       } else {
-        guardBanner.style.display = 'none';
-      }
-
-      const reviewBanner = document.getElementById('humanReviewAlertBanner');
-      if (d.needs_human_review) {
-        reviewBanner.style.display = 'flex';
-        const reasons = (d.review_reasons || []).join('; ') || 'Low model certainty threshold';
-        document.getElementById('humanReviewReasons').textContent = 'Flagged reasons: ' + reasons;
-      } else {
-        reviewBanner.style.display = 'none';
-      }
-
-      // 3. Priority Progress Bar
-      const prio = Number(d.priority_score || 0);
-      document.getElementById('priorityScoreVal').textContent = prio + ' / 100';
-      const fillBar = document.getElementById('priorityFillBar');
-      fillBar.style.width = Math.min(100, Math.max(5, prio)) + '%';
-      if (prio >= 85) fillBar.style.backgroundColor = '#DC2626';
-      else if (prio >= 65) fillBar.style.backgroundColor = '#EA580C';
-      else if (prio >= 45) fillBar.style.backgroundColor = '#CA8A04';
-      else fillBar.style.backgroundColor = '#16A34A';
-
-      // 4. Meta Details
-      document.getElementById('resTeamVal').textContent = d.owner_team || 'O&M Team';
-      document.getElementById('resSlaVal').textContent = (d.sla_hours || 24) + ' Hours';
-      document.getElementById('resTierVal').textContent = (d.escalation_tier || 'Standard').split(' ')[0];
-
-      const catConf = ((d.confidence?.category || 0) * 100).toFixed(0);
-      const sevConf = ((d.confidence?.severity || 0) * 100).toFixed(0);
-      document.getElementById('resConfidenceVal').textContent = catConf + '% / ' + sevConf + '%';
-      document.getElementById('resExplanationText').textContent = d.explanation || 'No summary text available.';
-
-      // 5. Runbook Causes & Actions
-      const runbookBadge = document.getElementById('runbookIdBadge');
-      runbookBadge.textContent = d.runbook_id || 'RB-STANDARD';
-
-      const causesList = document.getElementById('resProbableCausesList');
-      causesList.innerHTML = (d.probable_causes || ['Inspect equipment logs.']).map(c => `<li>${escapeHtml(c)}</li>`).join('');
-
-      const actionsList = document.getElementById('resNextActionsList');
-      actionsList.innerHTML = (d.next_actions || ['Dispatch technician for check.']).map(a => `<li>${escapeHtml(a)}</li>`).join('');
-
-      // 6. Why This Prediction Highlights
-      renderHighlightCard(rawText, d.top_contributing_terms);
-
-      // 7. Agent Trace (9 Steps)
-      renderAgentTrace(d.agent_trace || []);
-    }
-
-    function renderHighlightCard(rawText, terms) {
-      let html = escapeHtml(rawText);
-      const chipsBox = document.getElementById('topTermsChips');
-      chipsBox.innerHTML = '';
-
-      const validTerms = (terms || []).filter(t => !t.term.startsWith('asset_type_')).sort((a,b) => b.term.length - a.term.length);
-      
-      for (const t of validTerms) {
-        const escaped = t.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = new RegExp('\\b(' + escaped + ')\\b', 'gi');
-        html = html.replace(re, '<mark class="term-hit">$1</mark>');
-
-        const chip = document.createElement('span');
-        chip.style.cssText = 'background:#F1F5F9; border:1px solid #E2E8F0; padding:2px 8px; border-radius:6px; font-size:11px; color:#334155;';
-        chip.textContent = `${t.term} (+${t.weight})`;
-        chipsBox.appendChild(chip);
-      }
-      document.getElementById('textWithHighlights').innerHTML = html;
-    }
-
-    function renderAgentTrace(trace) {
-      const container = document.getElementById('agentTraceList');
-      container.innerHTML = '';
-
-      trace.forEach(step => {
-        const isEscalated = step.tool === 'safety_guardrail' && step.output?.escalated;
-        const item = document.createElement('div');
-        item.className = 'trace-step-item' + (isEscalated ? ' escalated' : '');
-
-        const toolNameFormatted = step.tool.replace(/_/g, ' ').toUpperCase();
-        let desc = '';
-        if (step.step === 1) desc = 'Normalizes text and extracts equipment IDs via regex.';
-        else if (step.step === 2) desc = 'TF-IDF + Logistic Regression proposes fault category & severity.';
-        else if (step.step === 3) desc = 'Escalate-only safety rules check critical hazards.';
-        else if (step.step === 4) desc = 'Runbook SOP retrieval via TF-IDF cosine similarity.';
-        else if (step.step === 5) desc = 'Token Jaccard similarity check against recent tickets.';
-        else if (step.step === 6) desc = 'Transparent weighted priority score calculation.';
-        else if (step.step === 7) desc = 'Assigned maintenance team and target response SLA.';
-        else if (step.step === 8) desc = 'Confidence gate evaluation for human review flag.';
-        else if (step.step === 9) desc = 'Verified summary generation (deterministic template).';
-
-        item.innerHTML = `
-          <div class="trace-step-header">
-            <span class="trace-step-title">Step ${step.step}: ${escapeHtml(toolNameFormatted)}</span>
-            <span class="badge ${isEscalated ? 'badge-critical' : 'badge-info'}" style="font-size:10px;">
-              ${isEscalated ? 'Escalated' : 'Executed'}
-            </span>
-          </div>
-          <div class="trace-step-desc">${desc}</div>
-          <div class="trace-step-payload">${escapeHtml(JSON.stringify(step.output, null, 2))}</div>
-        `;
-        container.appendChild(item);
-      });
-    }
-
-    function recordInSessionHistory(d) {
-      recentSessionTickets.unshift(d);
-      if (recentSessionTickets.length > 50) recentSessionTickets.pop();
-
-      const tbody = document.getElementById('historyTableBody');
-      if (!tbody) return;
-
-      tbody.innerHTML = recentSessionTickets.map((t, idx) => {
-        const sevClass = 'badge-' + (t.severity === 'critical' ? 'critical' : t.severity === 'high' ? 'high' : t.severity === 'low' ? 'low' : 'medium');
-        return `
-          <tr>
-            <td><strong>${escapeHtml(t.ticket_id || 'ADHOC')}</strong></td>
-            <td style="text-transform:capitalize;">${escapeHtml(t.asset_type)}</td>
-            <td><code>${escapeHtml(t.category)}</code></td>
-            <td><span class="badge ${sevClass}">${escapeHtml(t.severity)}</span></td>
-            <td><strong>${t.priority_score}</strong>/100</td>
-            <td>${escapeHtml(t.owner_team)}</td>
-            <td>${t.needs_human_review ? '<span class="badge badge-warning">Review Required</span>' : '<span class="badge badge-low">Verified</span>'}</td>
-            <td>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="downloadHistoryTicketPdf(${idx})" title="Download PDF Report">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                <span>PDF</span>
-              </button>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    // PDF Report Actions & Handling
-    function showPdfFeedback(type, message) {
-      const banner = document.getElementById('pdfFeedbackBanner');
-      const icon = document.getElementById('pdfFeedbackIcon');
-      const msg = document.getElementById('pdfFeedbackMsg');
-      if (!banner) return;
-
-      banner.style.display = 'flex';
-      banner.className = 'result-alert ' + (type === 'success' ? 'alert-success' : 'alert-escalation');
-      if (type === 'success') {
-        icon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
-      } else {
-        icon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
-      }
-      msg.innerHTML = message;
-    }
-
-    async function downloadCurrentTriagePdf() {
-      if (!currentTriageResult) {
-        showPdfFeedback('error', 'No active triage result available to generate a PDF report.');
-        return;
-      }
-      await fetchPdfAndDownload(currentTriageResult, 'downloadPdfBtn', 'downloadPdfBtnText');
-    }
-
-    async function printCurrentReport() {
-      if (!currentTriageResult) {
-        showPdfFeedback('error', 'No active triage result available to print.');
-        return;
-      }
-      await fetchPdfAndPrint(currentTriageResult, 'printReportBtn', 'printReportBtnText');
-    }
-
-    async function downloadHistoryTicketPdf(index) {
-      const ticket = recentSessionTickets[index];
-      if (!ticket) {
-        alert('Ticket data not found in session buffer.');
-        return;
-      }
-      await fetchPdfAndDownload(ticket, null, null);
-    }
-
-    async function fetchPdfAndDownload(payload, btnId, textId) {
-      const btn = btnId ? document.getElementById(btnId) : null;
-      const textSpan = textId ? document.getElementById(textId) : null;
-      const originalText = textSpan ? textSpan.textContent : '';
-
-      if (btn) {
-        btn.disabled = true;
-        if (textSpan) textSpan.innerHTML = `<span class="spinner-sm"></span> Generating PDF...`;
-      }
-
-      try {
-        const res = await fetch(API_BASE + '/api/reports/ticket-pdf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || 'Server error (' + res.status + ') generating PDF');
-        }
-
-        const blob = await res.blob();
-        let filename = 'Maintenance_Report_' + (payload.ticket_id || 'TICKET') + '.pdf';
-
-        const disp = res.headers.get('Content-Disposition');
-        if (disp && disp.includes('filename=')) {
-          const match = disp.match(/filename="?([^";]+)"?/);
-          if (match && match[1]) filename = match[1];
-        }
-
-        const blobUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = blobUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(blobUrl);
-        }, 300);
-
-        showPdfFeedback('success', `<strong>PDF Report Ready:</strong> <code>${escapeHtml(filename)}</code> downloaded successfully.`);
-      } catch (err) {
-        showPdfFeedback('error', `<strong>Report Generation Failed:</strong> ${escapeHtml(err.message)}`);
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          if (textSpan) textSpan.textContent = originalText;
-        }
+        safetyBanner.style.display = 'none';
       }
     }
 
-    async function fetchPdfAndPrint(payload, btnId, textId) {
-      const btn = btnId ? document.getElementById(btnId) : null;
-      const textSpan = textId ? document.getElementById(textId) : null;
-      const originalText = textSpan ? textSpan.textContent : '';
-
-      if (btn) {
-        btn.disabled = true;
-        if (textSpan) textSpan.innerHTML = `<span class="spinner-sm dark"></span> Preparing...`;
-      }
-
-      try {
-        const res = await fetch(API_BASE + '/api/reports/ticket-pdf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || 'Server error (' + res.status + ') generating print document');
-        }
-
-        const blob = await res.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-
-        // Open in iframe or window for native print dialog
-        const printWindow = window.open(blobUrl, '_blank');
-        if (printWindow) {
-          printWindow.focus();
-        } else {
-          // Fallback via hidden iframe
-          const iframe = document.createElement('iframe');
-          iframe.style.position = 'fixed';
-          iframe.style.right = '0';
-          iframe.style.bottom = '0';
-          iframe.style.width = '0';
-          iframe.style.height = '0';
-          iframe.style.border = '0';
-          iframe.src = blobUrl;
-          document.body.appendChild(iframe);
-          iframe.onload = () => {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-          };
-        }
-
-        showPdfFeedback('success', `<strong>Print Document Ready:</strong> Opened official maintenance report in print preview.`);
-      } catch (err) {
-        showPdfFeedback('error', `<strong>Print Preparation Failed:</strong> ${escapeHtml(err.message)}`);
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          if (textSpan) textSpan.textContent = originalText;
-        }
-      }
-    }
-
-    // Analytics Data Fetching & Rendering
-    async function loadAnalyticsData() {
-      if (metricsCache) return;
-
-      try {
-        const res = await fetch(API_BASE + '/api/metrics');
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        metricsCache = data;
-
-        // KPI Row
-        document.getElementById('kpiTotalDedup').textContent = data.dataset_summary?.total_deduplicated_rows || '426';
-        document.getElementById('kpiCvCatF1').textContent = data.cross_validation?.category_macro_f1?.mean?.toFixed(4) || '1.0000';
-        document.getElementById('kpiCvCritRecall').textContent = `${(data.cross_validation?.critical_recall?.mean * 100).toFixed(1)}% ± ${(data.cross_validation?.critical_recall?.std * 100).toFixed(1)}%`;
-        document.getElementById('kpiCvUnderTriage').textContent = `${(data.cross_validation?.under_triage_rate?.mean * 100).toFixed(1)}% ± ${(data.cross_validation?.under_triage_rate?.std * 100).toFixed(1)}%`;
-
-        // Model Comparison Table
-        const compBody = document.getElementById('modelComparisonBody');
-        compBody.innerHTML = (data.model_comparison || []).map(m => {
-          const isSelected = m.model.includes('LogisticRegression');
-          return `
-            <tr class="${isSelected ? 'highlighted-row' : ''}">
-              <td><strong>${escapeHtml(m.model)}</strong> ${isSelected ? '<span class="badge badge-low" style="margin-left:6px; font-size:10px;">Selected Main</span>' : ''}</td>
-              <td>${m.test_category_macro_f1.toFixed(4)}</td>
-              <td>${(m.test_severity_metrics.critical_recall * 100).toFixed(1)}%</td>
-              <td>${(m.test_severity_metrics.under_triage_rate * 100).toFixed(1)}%</td>
-              <td><strong>${m.challenge_category_macro_f1.toFixed(4)}</strong></td>
-              <td>${(m.challenge_severity_metrics.critical_recall * 100).toFixed(1)}%</td>
-              <td><strong style="color:${m.challenge_severity_metrics.under_triage_rate <= 0.15 ? '#166534' : '#C2410C'}">${(m.challenge_severity_metrics.under_triage_rate * 100).toFixed(1)}%</strong></td>
-            </tr>
-          `;
-        }).join('');
-
-        // Confusion Heatmap
-        const cm = data.test_severity_confusion_matrix || [];
-        const labels = data.severity_labels || ['low', 'medium', 'high', 'critical'];
-        const cmBody = document.getElementById('confusionHeatmapBody');
-        cmBody.innerHTML = cm.map((row, rIdx) => {
-          const rowLabel = labels[rIdx].toUpperCase();
-          const cells = row.map((val, cIdx) => {
-            const isDiag = rIdx === cIdx;
-            const cls = isDiag ? 'heatmap-cell cell-diag' : (val > 0 ? 'heatmap-cell cell-off' : 'heatmap-cell cell-zero');
-            return `<td class="${cls}">${val}</td>`;
-          }).join('');
-          return `<tr><th>${rowLabel}</th>${cells}</tr>`;
-        }).join('');
-
-        // Ablation Table
-        const ablBody = document.getElementById('ablationTableBody');
-        ablBody.innerHTML = (data.ablation || []).map(a => `
-          <tr>
-            <td><strong>${escapeHtml(a.variant)}</strong></td>
-            <td>${a.test_category_macro_f1.toFixed(4)}</td>
-            <td>${a.test_severity_macro_f1.toFixed(4)}</td>
-            <td><strong>${a.challenge_category_macro_f1.toFixed(4)}</strong></td>
-            <td>${a.challenge_severity_macro_f1.toFixed(4)}</td>
-          </tr>
-        `).join('');
-
-      } catch (err) {
-        console.error('Failed to load metrics:', err);
-      }
-    }
-
-    // Startup
-    window.addEventListener('DOMContentLoaded', () => {
-      checkBackendHealth();
-      setInterval(checkBackendHealth, 30000);
-    });
+    window.addEventListener('DOMContentLoaded', initDemo);
   </script>
 </body>
 </html>
