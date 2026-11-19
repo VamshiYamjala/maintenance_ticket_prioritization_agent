@@ -16,3 +16,6 @@ Thumbs.db
 
 # Generated artifacts (models are reproducible via python -m backend.evaluate)
 .pytest_cache/
+
+*.zip
+maintenance_ticket_prioritization_agent_refactored/
